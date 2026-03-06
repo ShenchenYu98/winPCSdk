@@ -1,0 +1,31 @@
+{
+  "name": "winpc-skill-sdk",
+  "version": "0.1.0",
+  "description": "Agent Skill runtime/SDK module",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "mock:start": "tsx mock/run-mock.ts",
+    "mock:demo": "tsx mock/demo-client.ts",
+    "ui:start": "npm.cmd run build && node mock/ui-server.mjs",
+    "ui:serve": "node mock/ui-server.mjs"
+  },
+  "keywords": [
+    "skill",
+    "sdk",
+    "agent"
+  ],
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.4",
+    "ws": "^8.18.3"
+  }
+}

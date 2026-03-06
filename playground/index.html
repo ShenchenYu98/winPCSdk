@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Skill SDK 可视化测试页</title>
+    <style>
+      :root {
+        --bg: #f3f4f6;
+        --panel: #ffffff;
+        --line: #d1d5db;
+        --text: #111827;
+        --muted: #6b7280;
+        --brand: #0f766e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 20px;
+        background: linear-gradient(135deg, #e5f4ff, #f9fafb 60%);
+        color: var(--text);
+        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+      h1 { margin: 0 0 16px; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 16px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+      }
+      .card h2 { margin: 0 0 12px; font-size: 16px; }
+      label {
+        display: block;
+        margin: 8px 0 4px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      input, textarea, select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px;
+      }
+      textarea { min-height: 72px; }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      button {
+        border: 0;
+        border-radius: 8px;
+        padding: 8px 12px;
+        background: #e5e7eb;
+        cursor: pointer;
+      }
+      button.primary {
+        background: var(--brand);
+        color: #fff;
+      }
+      #logs {
+        margin-top: 14px;
+        max-height: 360px;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #0b1220;
+        color: #d1d5db;
+        padding: 10px;
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 12px;
+      }
+      .log-line { padding: 3px 0; border-bottom: 1px dashed rgba(255,255,255,.08); }
+    </style>
+  </head>
+  <body>
+    <h1>Skill SDK 可视化测试页</h1>
+
+    <div class="grid">
+      <section class="card">
+        <h2>SDK 初始化</h2>
+        <label>baseHttpUrl</label>
+        <input id="baseHttpUrl" value="http://localhost:8082" />
+        <label>baseWsUrl</label>
+        <input id="baseWsUrl" value="ws://localhost:8082" />
+        <label>skillDefinitionId</label>
+        <input id="skillDefinitionId" value="1" />
+        <div class="actions">
+          <button id="btnPing">Ping服务端</button><button id="btnInit" class="primary">初始化 SDK</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>会话参数</h2>
+        <label>imChatId</label>
+        <input id="imChatId" value="chat-ui-001" />
+        <label>userId</label>
+        <input id="userId" value="10001" />
+        <label>agentId（可选）</label>
+        <input id="agentId" value="1" />
+        <label>title（可选）</label>
+        <input id="title" value="UI测试会话" />
+        <label>sessionId（可手动输入）</label>
+        <input id="sessionId" placeholder="executeSkill 后会自动回填" />
+      </section>
+
+      <section class="card">
+        <h2>消息与控制</h2>
+        <label>content</label>
+        <textarea id="content">请生成一段 mock 测试输出</textarea>
+        <div class="actions">
+          <button id="btnExecute" class="primary">executeSkill</button>
+          <button id="btnSend">sendMessage</button>
+          <button id="btnRegenerate">regenerateAnswer</button>
+          <button id="btnStop">stopSkill</button>
+          <button id="btnClose">closeSkill</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>历史 / IM / 权限</h2>
+        <label>page</label>
+        <input id="page" value="0" />
+        <label>size</label>
+        <input id="size" value="50" />
+        <div class="actions">
+          <button id="btnHistory">getSessionMessage</button>
+          <button id="btnCopy">copySkillResult</button>
+        </div>
+
+        <label>发送到 IM 内容</label>
+        <textarea id="imContent">这是来自 UI 测试页的 IM 消息</textarea>
+        <div class="actions">
+          <button id="btnSendIm">sendMessageToIM</button>
+        </div>
+
+        <label>permissionId</label>
+        <input id="permissionId" value="perm-ui-001" />
+        <label>approved</label>
+        <select id="approved">
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </select>
+        <div class="actions">
+          <button id="btnPermission">replyPermission</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>小程序控制</h2>
+        <div class="actions">
+          <button id="btnMinimize">control(minimize)</button>
+          <button id="btnWeClose">control(close)</button>
+        </div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:16px;">
+      <h2>日志</h2>
+      <div class="actions">
+        <button id="btnClearLog">清空日志</button>
+      </div>
+      <div id="logs"></div>
+    </section>
+
+    <script type="module" src="/playground/app.js"></script>
+  </body>
+</html>
