@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IM Chat Scenario - Skill WinPC SDK</title>
+    <link rel="stylesheet" href="./im-chat.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-head">
+        <div>
+          <h1>Skill IM Chat Sandbox</h1>
+          <p>5 fixed sessions on the left, chat center, event and mini app panel on the right.</p>
+        </div>
+        <div class="head-actions">
+          <a class="link-btn" href="./index.html">Open API Harness</a>
+          <span id="statusChip" class="chip offline">Client Offline</span>
+        </div>
+      </header>
+
+      <section class="setup card">
+        <h2>Connection Setup</h2>
+        <div class="setup-grid">
+          <label>Base URL <input id="baseUrl" value="http://127.0.0.1:19082" /></label>
+          <label>WS URL <input id="wsUrl" value="ws://127.0.0.1:19082" /></label>
+          <label>Env
+            <select id="env">
+              <option value="dev">dev</option>
+              <option value="test" selected>test</option>
+              <option value="prod">prod</option>
+            </select>
+          </label>
+          <label>imChatId <input id="imChatId" value="chat-im-scene-01" /></label>
+          <label>skillDefinitionId <input id="skillDefinitionId" value="1" /></label>
+          <label>userId <input id="userId" value="im-user-001" /></label>
+        </div>
+        <div class="row">
+          <button id="initClient">Init Client</button>
+          <button id="closeSkillAll" class="ghost">closeSkill()</button>
+          <button id="refreshMetrics" class="ghost">Refresh Metrics</button>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <aside class="sessions card">
+          <header class="sessions-head">
+            <h2>Session Slots</h2>
+            <span id="sessionCount" class="count-tag">5</span>
+          </header>
+          <div id="sessionList" class="session-list"></div>
+          <p class="session-tip">Each slot creates one session on first `/skillName ...`, then keeps multi-turn chat in same session.</p>
+        </aside>
+
+        <section class="chat card">
+          <header class="chat-head">
+            <div>
+              <h2>Skill Assistant</h2>
+              <div class="meta">
+                <span>session: <strong id="sessionIdLabel">-</strong></span>
+                <span>status: <strong id="executionStatusLabel">idle</strong></span>
+              </div>
+            </div>
+          </header>
+
+          <div id="imTimeline" class="timeline"></div>
+
+          <footer class="composer">
+            <textarea id="composerInput" placeholder="Use /skillName ... for first run in current slot. Then keep chatting in same session."></textarea>
+            <div class="row">
+              <button id="primaryAction">Execute</button>
+              <button id="getHistory" class="ghost">Get History</button>
+              <button id="regenerate" class="ghost">Regenerate</button>
+              <button id="sendToIm" class="ghost">Send To IM</button>
+            </div>
+          </footer>
+        </section>
+
+        <aside class="side card">
+          <div class="panel">
+            <header class="panel-head">
+              <h3>Mini App Container</h3>
+              <span id="miniappState" class="chip">hidden</span>
+            </header>
+            <div id="miniappPanel" class="miniapp-panel hidden">
+              <div class="row">
+                <button id="miniOpen" class="ghost">Open</button>
+                <button id="miniMinimize" class="ghost">Minimize</button>
+                <button id="miniClose" class="warn">Close</button>
+              </div>
+              <label>Mini App URL <input id="miniAppUrl" value="http://127.0.0.1:3000" /></label>
+              <div class="row">
+                <button id="miniReload" class="ghost">Reload Mini App</button>
+              </div>
+              <div id="miniAppHint" class="miniapp-hint">Current slot has no session yet.</div>
+              <iframe id="miniAppFrame" class="miniapp-frame" title="Mini App Container"></iframe>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Permission Reply</h3>
+            <label>permissionId <input id="permissionId" value="perm-im-001" /></label>
+            <div class="row">
+              <button id="permApprove">Approve</button>
+              <button id="permReject" class="ghost">Reject</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="row">
+              <h3>Event Log</h3>
+              <button id="clearEventLog" class="ghost">Clear</button>
+            </div>
+            <pre id="eventLog"></pre>
+          </div>
+
+          <div class="panel">
+            <h3>Metrics Snapshot</h3>
+            <pre id="metricsView"></pre>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module" src="./im-chat.ts"></script>
+  </body>
+</html>

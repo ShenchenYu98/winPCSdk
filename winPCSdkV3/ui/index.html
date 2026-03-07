@@ -1,0 +1,108 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Skill WinPC SDK Web UI Harness</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-a"></div>
+    <div class="bg-shape bg-shape-b"></div>
+
+    <main class="layout">
+      <header class="hero">
+        <h1>Skill WinPC SDK Web UI Harness</h1>
+        <p>在 `skill-winPc` 内直接模拟真实 Web UI 调用，覆盖 execute/send/stop/close/permission/wecode 等核心链路。</p>
+        <div class="row">
+          <a class="nav-link" href="./im-chat.html">打开 IM Chat 场景页</a>
+        </div>
+      </header>
+
+      <section class="panel grid-two">
+        <div>
+          <h2>Client Config</h2>
+          <label>Base URL <input id="baseUrl" value="http://127.0.0.1:19082" /></label>
+          <label>WS URL <input id="wsUrl" value="ws://127.0.0.1:19082" /></label>
+          <label>Env
+            <select id="env">
+              <option value="dev">dev</option>
+              <option value="test" selected>test</option>
+              <option value="prod">prod</option>
+            </select>
+          </label>
+          <div class="row">
+            <button id="initClient">Init Client</button>
+            <button id="closeSkillGlobal" class="ghost">closeSkill()</button>
+          </div>
+          <div id="clientState" class="chip">client: not initialized</div>
+        </div>
+
+        <div>
+          <h2>Execute Skill</h2>
+          <label>imChatId <input id="imChatId" value="chat-ui-001" /></label>
+          <label>skillDefinitionId <input id="skillDefinitionId" value="1" /></label>
+          <label>userId <input id="userId" value="web-user-001" /></label>
+          <label>agentId (optional) <input id="agentId" placeholder="99" /></label>
+          <label>title (optional) <input id="title" value="Web UI Harness Session" /></label>
+          <label>skillContent <textarea id="skillContent">请帮我分析一个登录模块重构方案</textarea></label>
+          <button id="executeSkill">executeSkill()</button>
+        </div>
+      </section>
+
+      <section class="panel grid-two">
+        <div>
+          <h2>Session Runtime</h2>
+          <label>Current Session ID <input id="currentSessionId" placeholder="执行后自动填充" /></label>
+          <div class="row">
+            <button id="registerListener">registerSessionListener()</button>
+            <button id="unregisterListener" class="ghost">unregisterSessionListener()</button>
+          </div>
+          <div class="row">
+            <button id="bindStatus">onSessionStatusChange()</button>
+            <button id="stopSkill" class="warn">stopSkill()</button>
+          </div>
+          <div class="row">
+            <button id="regenerate">regenerateAnswer()</button>
+            <button id="getMessages" class="ghost">getSessionMessage()</button>
+          </div>
+          <label>sendMessage content <textarea id="sendContent">继续追问：请给出分阶段实施步骤</textarea></label>
+          <button id="sendMessage">sendMessage()</button>
+        </div>
+
+        <div>
+          <h2>Collaboration APIs</h2>
+          <label>sendMessageToIM content <textarea id="imContent">将当前结论同步到IM</textarea></label>
+          <button id="sendToIm">sendMessageToIM()</button>
+
+          <label>permissionId <input id="permissionId" value="perm-ui-001" /></label>
+          <div class="row">
+            <button id="replyApprove">replyPermission(true)</button>
+            <button id="replyReject" class="ghost">replyPermission(false)</button>
+          </div>
+
+          <div class="row">
+            <button id="wecodeMinimize">controlSkillWeCode(minimize)</button>
+            <button id="wecodeClose" class="ghost">controlSkillWeCode(close)</button>
+          </div>
+          <button id="bindWecode">onSkillWecodeStatusChange()</button>
+        </div>
+      </section>
+
+      <section class="panel grid-two">
+        <div>
+          <h2>Stream / Status</h2>
+          <pre id="streamView" class="console"></pre>
+        </div>
+        <div>
+          <h2>Log + Metrics</h2>
+          <pre id="logView" class="console"></pre>
+          <button id="refreshMetrics" class="ghost">refresh metrics</button>
+          <pre id="metricsView" class="console small"></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
