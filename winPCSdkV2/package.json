@@ -1,0 +1,32 @@
+{
+  "name": "@opencode-cui/skill-winpc-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Skill WinPC SDK MVP with mock harness",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "l7": "tsx scripts/run-l7.ts",
+    "mock:server": "tsx scripts/run-mock-server.ts",
+    "ui:dev": "vite --config ui/vite.config.ts ui --host",
+    "ui:build": "vite build --config ui/vite.config.ts ui"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2",
+    "vite": "^7.3.1",
+    "vitest": "^3.2.4"
+  }
+}

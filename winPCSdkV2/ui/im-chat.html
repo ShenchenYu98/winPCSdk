@@ -1,0 +1,109 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IM Chat Scenario - Skill WinPC SDK</title>
+    <link rel="stylesheet" href="./im-chat.css" />
+  </head>
+  <body>
+    <div class="backdrop"></div>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <h1>IM Chat Scenario Sandbox</h1>
+          <p>真实 IM 聊天场景模拟：`/skillName` 执行技能、多轮对话、停止、最小化小程序、发送到 IM、重生成。</p>
+        </div>
+        <div class="top-actions">
+          <a class="link-btn" href="./index.html">打开 API Harness</a>
+          <span id="statusChip" class="chip offline">Client Offline</span>
+        </div>
+      </header>
+
+      <section class="setup card">
+        <h2>Connection Setup</h2>
+        <div class="setup-grid">
+          <label>Base URL <input id="baseUrl" value="http://127.0.0.1:19082" /></label>
+          <label>WS URL <input id="wsUrl" value="ws://127.0.0.1:19082" /></label>
+          <label>Env
+            <select id="env">
+              <option value="dev">dev</option>
+              <option value="test" selected>test</option>
+              <option value="prod">prod</option>
+            </select>
+          </label>
+          <label>imChatId <input id="imChatId" value="chat-im-scene-01" /></label>
+          <label>skillDefinitionId <input id="skillDefinitionId" value="1" /></label>
+          <label>userId <input id="userId" value="im-user-001" /></label>
+        </div>
+        <div class="row">
+          <button id="initClient">Init Client</button>
+          <button id="closeSkillAll" class="ghost">closeSkill()</button>
+          <button id="refreshMetrics" class="ghost">刷新指标</button>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <section class="im card">
+          <header class="section-title">
+            <h2>IM Chat Window</h2>
+            <div class="session-meta">
+              <span>session:</span>
+              <strong id="sessionIdLabel">-</strong>
+              <span>status:</span>
+              <strong id="executionStatusLabel">idle</strong>
+            </div>
+          </header>
+
+          <div id="imTimeline" class="timeline"></div>
+
+          <div class="composer">
+            <textarea id="composerInput" placeholder="输入 /skillName 帮我做xxx 执行技能，或输入普通文本继续会话"></textarea>
+            <div class="row">
+              <button id="primaryAction">执行</button>
+              <button id="regenerate" class="ghost">重生成</button>
+              <button id="sendToIm" class="ghost">发送结果到IM</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="miniapp card">
+          <header class="section-title">
+            <h2>Mini App Container</h2>
+            <span id="miniappState" class="chip">hidden</span>
+          </header>
+
+          <div id="miniappPanel" class="miniapp-panel hidden">
+            <div class="row">
+              <button id="miniOpen" class="ghost">打开容器</button>
+              <button id="miniMinimize" class="ghost">最小化</button>
+              <button id="miniClose" class="warn">关闭</button>
+            </div>
+            <div id="miniappFeed" class="feed"></div>
+          </div>
+
+          <div class="perm card-inner">
+            <h3>Permission Reply</h3>
+            <label>permissionId <input id="permissionId" value="perm-im-001" /></label>
+            <div class="row">
+              <button id="permApprove">批准</button>
+              <button id="permReject" class="ghost">拒绝</button>
+            </div>
+          </div>
+
+          <div class="logs card-inner">
+            <h3>Event Log</h3>
+            <pre id="eventLog"></pre>
+          </div>
+
+          <div class="metrics card-inner">
+            <h3>Metrics Snapshot</h3>
+            <pre id="metricsView"></pre>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="./im-chat.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,309 @@
+﻿:root {
+  --bg: #e8ece7;
+  --panel: #fbfcfa;
+  --line: #c9d1c7;
+  --ink: #18211d;
+  --muted: #5f6c65;
+  --brand: #0a6d5f;
+  --brand-soft: #d4ebe6;
+  --warn: #9d2e34;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: "Space Grotesk", "Noto Sans SC", "Segoe UI", sans-serif;
+  background: linear-gradient(130deg, #eef2ea 0%, #e2e8df 50%, #dde4db 100%);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 15% 15%, rgba(13, 109, 95, 0.16), transparent 45%),
+    radial-gradient(circle at 86% 90%, rgba(194, 130, 88, 0.2), transparent 42%);
+  pointer-events: none;
+}
+
+.app {
+  position: relative;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px 18px;
+  background: linear-gradient(160deg, #fafcf8, #f0f4ee);
+  box-shadow: 0 12px 30px rgba(28, 45, 34, 0.1);
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 27px;
+  letter-spacing: 0.3px;
+}
+
+.topbar p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.top-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.link-btn,
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: none;
+  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+}
+
+.link-btn,
+button {
+  background: var(--brand);
+  color: #fff;
+}
+
+button:hover,
+.link-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(10, 109, 95, 0.25);
+}
+
+button.ghost {
+  background: #405049;
+}
+
+button.warn {
+  background: var(--warn);
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 10px 24px rgba(28, 45, 34, 0.08);
+  padding: 14px;
+}
+
+.setup h2,
+.section-title h2,
+.card-inner h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.setup-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+input,
+textarea,
+select {
+  border: 1px solid #bfc9be;
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 12px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.timeline {
+  min-height: 420px;
+  max-height: 56vh;
+  overflow: auto;
+  border: 1px solid #c5d0c4;
+  border-radius: 12px;
+  padding: 10px;
+  background: linear-gradient(180deg, #ffffff, #f5f9f5);
+}
+
+.message {
+  margin-bottom: 9px;
+  display: grid;
+  gap: 4px;
+}
+
+.message .meta {
+  font-size: 11px;
+  color: #6a756f;
+}
+
+.bubble {
+  border-radius: 12px;
+  padding: 8px 10px;
+  line-height: 1.42;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message.me .bubble {
+  background: #d8efe8;
+  border: 1px solid #afd4c8;
+}
+
+.message.ai .bubble {
+  background: #f2f5fb;
+  border: 1px solid #cad4e8;
+}
+
+.message.sys .bubble {
+  background: #fff2df;
+  border: 1px solid #e8d1ac;
+  color: #624d2d;
+}
+
+.message.streaming .bubble {
+  border-style: dashed;
+}
+
+.composer {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.feed,
+#eventLog,
+#metricsView {
+  border: 1px solid #c4cdc3;
+  border-radius: 10px;
+  background: #f8fbf8;
+  min-height: 90px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  font-family: "JetBrains Mono", Consolas, monospace;
+}
+
+.feed-item {
+  border-bottom: 1px dashed #cad2ca;
+  padding: 6px 0;
+}
+
+.feed-item:last-child {
+  border-bottom: 0;
+}
+
+.miniapp-panel.hidden {
+  display: none;
+}
+
+.card-inner {
+  margin-top: 10px;
+  border: 1px solid #ccd3cb;
+  border-radius: 12px;
+  padding: 10px;
+  background: #f9fcf9;
+}
+
+.chip {
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  border: 1px solid transparent;
+}
+
+.chip.offline {
+  color: #4f5961;
+  background: #e4e9ed;
+  border-color: #cdd4da;
+}
+
+.chip.online {
+  color: #0a6d5f;
+  background: var(--brand-soft);
+  border-color: #9dcfc4;
+}
+
+.chip.running {
+  color: #6b4f00;
+  background: #f5e8bd;
+  border-color: #e6cd6f;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1080px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .topbar {
+    flex-direction: column;
+  }
+
+  .setup-grid {
+    grid-template-columns: 1fr;
+  }
+}
