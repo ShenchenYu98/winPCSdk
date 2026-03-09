@@ -309,40 +309,6 @@ button {
   font-size: 13px;
 }
 
-.miniapp-panel-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.miniapp-card {
-  background: #f8fafb;
-  border-radius: 18px;
-  padding: 16px;
-  display: grid;
-  gap: 10px;
-}
-
-.miniapp-card p {
-  margin: 0;
-  color: #46535c;
-}
-
-.miniapp-list {
-  display: grid;
-  gap: 8px;
-  color: #667781;
-}
-
-.miniapp-list-item {
-  display: grid;
-  gap: 4px;
-  border-radius: 14px;
-  padding: 10px 12px;
-  background: #fff;
-}
-
-.miniapp-actions button,
 .skill-status-bar button,
 .composer-action {
   border: 0;
@@ -353,12 +319,25 @@ button {
   box-shadow: 0 10px 24px rgba(7, 193, 96, 0.22);
 }
 
-.miniapp-actions button:nth-child(3),
-.miniapp-actions button:nth-child(4),
 .skill-status-bar button:nth-child(2) {
   background: #e9edef;
   color: #1f2c34;
   box-shadow: none;
+}
+
+.miniapp-frame-shell {
+  min-height: 620px;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(17, 27, 33, 0.08);
+  background: #fff;
+}
+
+.miniapp-frame {
+  width: 100%;
+  height: 620px;
+  border: 0;
+  display: block;
 }
 
 .composer-shell {
@@ -423,12 +402,6 @@ button:disabled {
   cursor: not-allowed;
 }
 
-@media (max-width: 1180px) {
-  .miniapp-panel-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 960px) {
   .wechat-shell {
     grid-template-columns: 1fr;
@@ -448,5 +421,11 @@ button:disabled {
 
   .bubble {
     max-width: 88%;
+  }
+
+  .miniapp-frame-shell,
+  .miniapp-frame {
+    min-height: 520px;
+    height: 520px;
   }
 }

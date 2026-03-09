@@ -373,48 +373,6 @@ export default function App() {
     await currentSdk.stopSkill({ welinkSessionId: selectedConversation.welinkSessionId });
   }
 
-  async function regenerate() {
-    const currentSdk = sdkRef.current;
-
-    if (!currentSdk || !selectedConversation?.welinkSessionId) {
-      return;
-    }
-
-    setBusyConversationId(selectedConversation.id);
-
-    try {
-      await currentSdk.regenerateAnswer({ welinkSessionId: selectedConversation.welinkSessionId });
-    } finally {
-      setBusyConversationId(null);
-    }
-  }
-
-  async function sendLastToIm() {
-    const currentSdk = sdkRef.current;
-
-    if (!currentSdk || !selectedConversation?.welinkSessionId) {
-      return;
-    }
-
-    const conversationId = selectedConversation.id;
-    const result = await currentSdk.sendMessageToIM({
-      welinkSessionId: selectedConversation.welinkSessionId
-    });
-
-    if (result.status !== "success") {
-      return;
-    }
-
-    const response = await fetch(`${runtimeConfig.baseUrl}/api/mock/im-messages`);
-    const payload = (await response.json()) as { messages: string[] };
-
-    updateConversation(conversationId, (conversation) => ({
-      ...conversation,
-      imMessages: payload.messages,
-      lastActivityAt: new Date().toISOString()
-    }));
-  }
-
   async function openMiniApp() {
     if (!selectedConversation) {
       return;
@@ -425,44 +383,6 @@ export default function App() {
       showSkillBar: true,
       isMiniAppOpen: !conversation.isMiniAppOpen
     }));
-  }
-
-  async function minimizeMiniApp() {
-    const currentSdk = sdkRef.current;
-
-    if (!selectedConversation) {
-      return;
-    }
-
-    updateConversation(selectedConversation.id, (conversation) => ({
-      ...conversation,
-      isMiniAppOpen: false
-    }));
-
-    if (!currentSdk) {
-      return;
-    }
-
-    await currentSdk.controlSkillWeCode({ action: "minimize" });
-  }
-
-  async function closeMiniApp() {
-    const currentSdk = sdkRef.current;
-
-    if (!selectedConversation) {
-      return;
-    }
-
-    updateConversation(selectedConversation.id, (conversation) => ({
-      ...conversation,
-      isMiniAppOpen: false
-    }));
-
-    if (!currentSdk) {
-      return;
-    }
-
-    await currentSdk.controlSkillWeCode({ action: "close" });
   }
 
   async function refreshConversationHistory(conversationId: string, sessionId: number) {
@@ -595,15 +515,8 @@ export default function App() {
             <div className="miniapp-drawer">
               <SkillMiniApp
                 sessionId={selectedConversation.welinkSessionId}
-                sessionStatus={selectedConversation.sessionStatus}
-                miniStatus={miniStatus}
-                messages={selectedConversation.messages}
-                streamEvents={selectedConversation.streamEvents}
-                imMessages={selectedConversation.imMessages}
-                onRegenerate={() => void regenerate()}
-                onSendLastToIm={() => void sendLastToIm()}
-                onMinimize={() => void minimizeMiniApp()}
-                onClose={() => void closeMiniApp()}
+                baseUrl={runtimeConfig.baseUrl}
+                wsUrl={runtimeConfig.wsUrl}
               />
             </div>
           ) : null}

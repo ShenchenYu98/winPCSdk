@@ -1,4 +1,9 @@
-import { createSkillClient, type SkillClient, type SkillClientInitOptions } from '../../../src/index';
+import {
+  getSharedBrowserSkillSdk,
+  type SessionMessage as SDKSessionMessage,
+  type SkillSdkApi,
+  type StreamMessage as SDKStreamMessage
+} from "../../../src/sdk";
 import type {
   ControlSkillWeCodeParams,
   ControlSkillWeCodeResult,
@@ -12,10 +17,10 @@ import type {
   StopSkillParams,
   StopSkillResult,
   StreamMessage,
-  UnregisterSessionListenerParams,
-} from '../types/jsapi';
+  UnregisterSessionListenerParams
+} from "../types/jsapi";
 
-type Channel = 'jsapi' | 'sdk';
+type Channel = "jsapi" | "sdk";
 
 interface RuntimeRouting {
   channel: Channel;
@@ -29,130 +34,226 @@ interface WrappedListener {
   onClose?: (reason: unknown) => void;
 }
 
-const listenerWrappers = new Map<string, Map<RegisterSessionListenerParams['onMessage'], WrappedListener>>();
+interface SdkOptions {
+  baseUrl: string;
+  wsUrl: string;
+}
+
+const listenerWrappers = new Map<
+  string,
+  Map<RegisterSessionListenerParams["onMessage"], WrappedListener>
+>();
 const runtimeRouting = detectRuntimeRouting();
-let sdkClient: SkillClient | null = null;
+let sdkClient: SkillSdkApi | null = null;
 
 function detectRuntimeRouting(): RuntimeRouting {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return {
-      channel: 'sdk',
+      channel: "sdk",
       isMobile: false,
-      hasHWH5: false,
+      hasHWH5: false
     };
   }
 
   const hostWindow = window as Window & { HWH5?: unknown };
-  const userAgent = (window.navigator?.userAgent || '').toLowerCase();
+  const userAgent = (window.navigator?.userAgent || "").toLowerCase();
   const maxTouchPoints = window.navigator?.maxTouchPoints || 0;
-  const touchCapable = maxTouchPoints > 0 || 'ontouchstart' in window;
+  const touchCapable = maxTouchPoints > 0 || "ontouchstart" in window;
   const mobileByUA = /(android|iphone|ipad|ipod|harmony|mobile)/.test(userAgent);
   const isMobile = mobileByUA && touchCapable;
-  const hasHWH5 = typeof hostWindow.HWH5 !== 'undefined';
+  const hasHWH5 = typeof hostWindow.HWH5 !== "undefined";
 
   if (isMobile && hasHWH5) {
     return {
-      channel: 'jsapi',
+      channel: "jsapi",
       isMobile,
-      hasHWH5,
+      hasHWH5
     };
   }
 
   return {
-    channel: 'sdk',
+    channel: "sdk",
     isMobile,
-    hasHWH5,
+    hasHWH5
   };
 }
 
 function checkJSAPI(): boolean {
-  return runtimeRouting.channel === 'jsapi';
+  return runtimeRouting.channel === "jsapi";
 }
 
-function getSdkClient(): SkillClient {
+function getSdkClient(): SkillSdkApi {
   if (sdkClient) {
     return sdkClient;
   }
 
-  const options = resolveSdkOptionsFromURL();
-  sdkClient = createSkillClient(options);
+  sdkClient = getSharedBrowserSkillSdk(resolveSdkOptionsFromURL());
   return sdkClient;
 }
 
-function resolveSdkOptionsFromURL(): SkillClientInitOptions {
-  const defaults: SkillClientInitOptions = {
-    baseUrl: 'http://127.0.0.1:19082',
-    wsUrl: 'ws://127.0.0.1:19082',
-    env: 'test',
+function resolveSdkOptionsFromURL(): SdkOptions {
+  const defaults: SdkOptions = {
+    baseUrl: "http://127.0.0.1:19082",
+    wsUrl: "ws://127.0.0.1:19082/ws/skill/stream"
   };
 
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return defaults;
   }
 
   const params = new URLSearchParams(window.location.search);
-  const baseUrl = params.get('baseUrl') || defaults.baseUrl;
-  const wsUrl = params.get('wsUrl') || toWsUrl(baseUrl);
-  const envParam = params.get('env');
-  const env = envParam === 'dev' || envParam === 'test' || envParam === 'prod' ? envParam : defaults.env;
+  const baseUrl = params.get("baseUrl") || defaults.baseUrl;
+  const wsUrl = params.get("wsUrl") || toWsUrl(baseUrl);
 
   return {
     baseUrl,
-    wsUrl,
-    env,
+    wsUrl
   };
 }
 
 function toWsUrl(baseUrl: string): string {
-  if (baseUrl.startsWith('https://')) {
-    return `wss://${baseUrl.slice('https://'.length)}`;
+  try {
+    const url = new URL(baseUrl);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+
+    if (url.pathname === "/" || url.pathname === "") {
+      url.pathname = "/ws/skill/stream";
+    }
+
+    return url.toString();
+  } catch {
+    return baseUrl;
   }
-  if (baseUrl.startsWith('http://')) {
-    return `ws://${baseUrl.slice('http://'.length)}`;
-  }
-  return baseUrl;
 }
 
-function toNumberId(value: unknown, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+function parseSessionId(sessionId: string): number {
+  return Number(sessionId);
+}
+
+function toMiniRole(role: SDKSessionMessage["role"]): "USER" | "ASSISTANT" | "SYSTEM" | "TOOL" {
+  if (role === "user") {
+    return "USER";
+  }
+
+  if (role === "assistant") {
+    return "ASSISTANT";
+  }
+
+  if (role === "tool") {
+    return "TOOL";
+  }
+
+  return "SYSTEM";
 }
 
 function normalizeStreamMessage(raw: unknown): StreamMessage {
-  const candidate = raw as Partial<StreamMessage>;
-  const type = String(candidate.type ?? 'delta');
-  const sessionId = String(candidate.sessionId ?? '');
+  const candidate = raw as Partial<SDKStreamMessage> & {
+    sessionId?: string;
+    properties?: StreamMessage["properties"];
+    usage?: StreamMessage["usage"];
+  };
+  const sessionId = String(candidate.welinkSessionId ?? candidate.sessionId ?? "");
+  const seq = typeof candidate.seq === "number" ? candidate.seq : 0;
 
-  if (type === 'message.part.delta') {
+  if (candidate.type === "text.delta" || candidate.type === "thinking.delta") {
     return {
       sessionId,
-      type: 'message.part.delta',
-      seq: typeof candidate.seq === 'number' ? candidate.seq : 0,
-      content: candidate.properties?.delta ?? '',
-      properties: candidate.properties,
-      usage: candidate.usage,
+      type: "delta",
+      seq,
+      content: typeof candidate.content === "string" ? candidate.content : "",
+      usage: candidate.usage
     };
   }
 
-  if (type === 'message.part.updated') {
+  if (candidate.type === "streaming") {
     return {
       sessionId,
-      type: 'message.part.updated',
-      seq: typeof candidate.seq === 'number' ? candidate.seq : 0,
-      content: candidate.properties?.part?.text ?? '',
-      properties: candidate.properties,
-      usage: candidate.usage,
+      type: "message.part.updated",
+      seq,
+      content: buildPartsContent(candidate.parts),
+      properties: {
+        part: {
+          id: candidate.partId || "streaming",
+          sessionID: sessionId,
+          type: "text",
+          text: buildPartsContent(candidate.parts)
+        }
+      }
+    };
+  }
+
+  if (candidate.type === "text.done" || candidate.type === "thinking.done") {
+    return {
+      sessionId,
+      type: "done",
+      seq,
+      content: typeof candidate.content === "string" ? candidate.content : ""
+    };
+  }
+
+  if (candidate.type === "tool.update") {
+    return {
+      sessionId,
+      type: "message.updated",
+      seq,
+      content: candidate.output ?? candidate.content ?? candidate.toolName ?? ""
+    };
+  }
+
+  if (candidate.type === "question") {
+    return {
+      sessionId,
+      type: "message.updated",
+      seq,
+      content: candidate.question ?? candidate.content ?? ""
+    };
+  }
+
+  if (candidate.type === "permission.ask") {
+    return {
+      sessionId,
+      type: "message.updated",
+      seq,
+      content: candidate.title ?? candidate.content ?? ""
+    };
+  }
+
+  if (candidate.type === "file") {
+    return {
+      sessionId,
+      type: "message.updated",
+      seq,
+      content: candidate.fileName ?? candidate.content ?? ""
+    };
+  }
+
+  if (typeof candidate.error === "string") {
+    return {
+      sessionId,
+      type: "error",
+      seq,
+      content: candidate.error
     };
   }
 
   return {
     sessionId,
-    type: type as StreamMessage['type'],
-    seq: typeof candidate.seq === 'number' ? candidate.seq : 0,
-    content: typeof candidate.content === 'string' ? candidate.content : '',
-    properties: candidate.properties,
-    usage: candidate.usage,
+    type: "delta",
+    seq,
+    content: typeof candidate.content === "string" ? candidate.content : "",
+    usage: candidate.usage
   };
+}
+
+function buildPartsContent(parts: SDKStreamMessage["parts"]): string {
+  if (!parts?.length) {
+    return "";
+  }
+
+  return parts
+    .filter((part) => part.type === "text" || part.type === "thinking" || part.type === "file")
+    .map((part) => part.content || part.question || "")
+    .join("");
 }
 
 function getOrCreateWrappedListener(params: RegisterSessionListenerParams): WrappedListener {
@@ -172,17 +273,17 @@ function getOrCreateWrappedListener(params: RegisterSessionListenerParams): Wrap
       ? (error: unknown) => {
           const candidate = error as { code?: string; message?: string; timestamp?: number };
           params.onError?.({
-            code: String(candidate.code ?? 'UNKNOWN'),
-            message: String(candidate.message ?? 'Unknown error'),
-            timestamp: Number(candidate.timestamp ?? Date.now()),
+            code: String(candidate.code ?? "UNKNOWN"),
+            message: String(candidate.message ?? "Unknown error"),
+            timestamp: Number(candidate.timestamp ?? Date.now())
           });
         }
       : undefined,
     onClose: params.onClose
       ? (reason: unknown) => {
-          params.onClose?.(String(reason ?? 'closed'));
+          params.onClose?.(String(reason ?? "closed"));
         }
-      : undefined,
+      : undefined
   };
 
   bySession.set(params.onMessage, wrapped);
@@ -196,12 +297,13 @@ function getWrappedListener(params: UnregisterSessionListenerParams): WrappedLis
 
 function deleteWrappedListener(
   sessionId: string,
-  onMessage: RegisterSessionListenerParams['onMessage'],
+  onMessage: RegisterSessionListenerParams["onMessage"]
 ): void {
   const bySession = listenerWrappers.get(sessionId);
   if (!bySession) {
     return;
   }
+
   bySession.delete(onMessage);
   if (bySession.size === 0) {
     listenerWrappers.delete(sessionId);
@@ -221,25 +323,32 @@ export function hasHwh5Injected(): boolean {
 }
 
 export async function getSessionMessage(
-  params: GetSessionMessageParams,
+  params: GetSessionMessageParams
 ): Promise<GetSessionMessageResult> {
   if (checkJSAPI()) {
     return window.HWH5!.getSessionMessage(params);
   }
 
-  const sdkResult = await getSdkClient().getSessionMessage(params);
+  const sdkResult = await getSdkClient().getSessionMessage({
+    welinkSessionId: parseSessionId(params.sessionId),
+    page: params.page,
+    size: params.size
+  });
+
   return {
-    ...sdkResult,
-    content: sdkResult.content.map((message, index) => ({
-      id: toNumberId(message.id, index + 1),
-      sessionId: toNumberId(message.sessionId, toNumberId(params.sessionId, 0)),
-      seq: message.seq,
-      role: message.role,
+    content: sdkResult.content.map((message) => ({
+      id: message.id,
+      sessionId: message.welinkSessionId,
+      seq: message.messageSeq,
+      role: toMiniRole(message.role),
       content: message.content,
-      contentType: message.contentType,
-      createdAt: message.createdAt,
-      meta: message.meta ? JSON.stringify(message.meta) : undefined,
+      contentType: "MARKDOWN",
+      createdAt: message.createdAt
     })),
+    totalElements: sdkResult.total,
+    totalPages: sdkResult.size > 0 ? Math.ceil(sdkResult.total / sdkResult.size) : 0,
+    number: sdkResult.page,
+    size: sdkResult.size
   };
 }
 
@@ -251,10 +360,10 @@ export function registerSessionListener(params: RegisterSessionListenerParams): 
 
   const wrapped = getOrCreateWrappedListener(params);
   getSdkClient().registerSessionListener({
-    sessionId: params.sessionId,
+    welinkSessionId: parseSessionId(params.sessionId),
     onMessage: wrapped.onMessage,
     onError: wrapped.onError,
-    onClose: wrapped.onClose,
+    onClose: wrapped.onClose
   });
 }
 
@@ -270,10 +379,10 @@ export function unregisterSessionListener(params: UnregisterSessionListenerParam
   }
 
   getSdkClient().unregisterSessionListener({
-    sessionId: params.sessionId,
+    welinkSessionId: parseSessionId(params.sessionId),
     onMessage: wrapped.onMessage,
     onError: wrapped.onError,
-    onClose: wrapped.onClose,
+    onClose: wrapped.onClose
   });
   deleteWrappedListener(params.sessionId, params.onMessage);
 }
@@ -283,11 +392,15 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
     return window.HWH5!.sendMessage(params);
   }
 
-  const result = await getSdkClient().sendMessage(params);
+  const result = await getSdkClient().sendMessage({
+    welinkSessionId: parseSessionId(params.sessionId),
+    content: params.content
+  });
+
   return {
-    messageId: toNumberId(result.messageId, Date.now()),
-    seq: result.seq,
-    createdAt: result.createdAt,
+    messageId: result.id,
+    seq: result.messageSeq,
+    createdAt: result.createdAt
   };
 }
 
@@ -295,32 +408,55 @@ export async function stopSkill(params: StopSkillParams): Promise<StopSkillResul
   if (checkJSAPI()) {
     return window.HWH5!.stopSkill(params);
   }
-  return getSdkClient().stopSkill(params);
+
+  const result = await getSdkClient().stopSkill({
+    welinkSessionId: parseSessionId(params.sessionId)
+  });
+
+  return {
+    status: result.status === "aborted" ? "success" : "failed"
+  };
 }
 
 export async function sendMessageToIM(
-  params: SendMessageToIMParams,
+  params: SendMessageToIMParams
 ): Promise<SendMessageToIMResult> {
   if (checkJSAPI()) {
     return window.HWH5!.sendMessageToIM(params);
   }
-  return getSdkClient().sendMessageToIM(params);
+
+  const result = await getSdkClient().sendMessageToIM({
+    welinkSessionId: parseSessionId(params.sessionId)
+  });
+
+  return {
+    success: result.status === "success",
+    chatId: result.chatId,
+    contentLength: result.contentLength,
+    errorMessage: result.status === "failed" ? "sendMessageToIM failed" : undefined
+  };
 }
 
 export async function controlSkillWeCode(
-  params: ControlSkillWeCodeParams,
+  params: ControlSkillWeCodeParams
 ): Promise<ControlSkillWeCodeResult> {
   if (checkJSAPI()) {
     return window.HWH5!.controlSkillWeCode(params);
   }
-  return getSdkClient().controlSkillWeCode(params);
+
+  const result = await getSdkClient().controlSkillWeCode(params);
+
+  return {
+    status: result.status,
+    errorMessage: result.status === "failed" ? "controlSkillWeCode failed" : undefined
+  };
 }
 
 export function getSessionIdFromURL(): string | null {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return null;
   }
 
   const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('sessionid') || urlParams.get('sessionId') || null;
+  return urlParams.get("sessionid") || urlParams.get("sessionId") || null;
 }
