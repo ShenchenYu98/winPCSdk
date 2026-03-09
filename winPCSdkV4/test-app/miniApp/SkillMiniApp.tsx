@@ -4,6 +4,7 @@ interface SkillMiniAppProps {
   sessionId: number | null;
   baseUrl: string;
   wsUrl: string;
+  mockMode: "server" | "json";
 }
 
 export function SkillMiniApp(props: SkillMiniAppProps) {
@@ -17,9 +18,10 @@ export function SkillMiniApp(props: SkillMiniAppProps) {
     params.set("baseUrl", props.baseUrl);
     params.set("wsUrl", props.wsUrl);
     params.set("env", "test");
+    params.set("mockMode", props.mockMode);
 
     return `/miniapp/index.html?${params.toString()}`;
-  }, [props.baseUrl, props.sessionId, props.wsUrl]);
+  }, [props.baseUrl, props.mockMode, props.sessionId, props.wsUrl]);
 
   return (
     <section className="miniapp-panel">

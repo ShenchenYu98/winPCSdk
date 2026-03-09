@@ -4,6 +4,8 @@ import {
   type SkillSdkApi,
   type StreamMessage as SDKStreamMessage
 } from "../../../src/sdk";
+import mockFixture from "../../../mocks/mock.json";
+import { getSharedFixtureBrowserSkillSdk } from "../../../mocks/runtime/fixtureSkillSdk";
 import type {
   ControlSkillWeCodeParams,
   ControlSkillWeCodeResult,
@@ -44,6 +46,7 @@ const listenerWrappers = new Map<
   Map<RegisterSessionListenerParams["onMessage"], WrappedListener>
 >();
 const runtimeRouting = detectRuntimeRouting();
+const mockMode = resolveMockModeFromURL();
 let sdkClient: SkillSdkApi | null = null;
 
 function detectRuntimeRouting(): RuntimeRouting {
@@ -87,7 +90,13 @@ function getSdkClient(): SkillSdkApi {
     return sdkClient;
   }
 
-  sdkClient = getSharedBrowserSkillSdk(resolveSdkOptionsFromURL());
+  sdkClient =
+    mockMode === "json"
+      ? getSharedFixtureBrowserSkillSdk({
+          runtimeKey: mockFixture.runtimeKey,
+          fixtureData: mockFixture
+        })
+      : getSharedBrowserSkillSdk(resolveSdkOptionsFromURL());
   return sdkClient;
 }
 
@@ -128,6 +137,15 @@ function toWsUrl(baseUrl: string): string {
 
 function parseSessionId(sessionId: string): number {
   return Number(sessionId);
+}
+
+function resolveMockModeFromURL(): "server" | "json" {
+  if (typeof window === "undefined") {
+    return mockFixture.defaultMode === "json" ? "json" : "server";
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  return params.get("mockMode") === "json" ? "json" : "server";
 }
 
 function toMiniRole(role: SDKSessionMessage["role"]): "USER" | "ASSISTANT" | "SYSTEM" | "TOOL" {

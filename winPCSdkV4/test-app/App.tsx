@@ -1,5 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { getSharedBrowserSkillSdk } from "../src/sdk";
+import {
+  getSharedBrowserSkillSdk
+} from "../src/sdk";
 import type {
   SessionMessage,
   SessionMessagePart,
@@ -9,6 +11,8 @@ import type {
   StreamMessage
 } from "../src/sdk";
 import { SkillMiniApp } from "./miniApp/SkillMiniApp";
+import mockFixture from "../mocks/mock.json";
+import { getSharedFixtureBrowserSkillSdk } from "../mocks/runtime/fixtureSkillSdk";
 
 interface RuntimeConfig {
   baseUrl: string;
@@ -37,6 +41,8 @@ interface SkillCommand {
   skillName: string;
   prompt: string;
 }
+
+type MockMode = "server" | "json";
 
 const fallbackConfig: RuntimeConfig = {
   baseUrl: import.meta.env.VITE_SKILL_SERVER_BASE_URL ?? "http://localhost:8787",
@@ -83,9 +89,11 @@ const seededConversations: ChatConversation[] = [
 ];
 
 export default function App() {
+  const initialMockMode = getInitialMockMode();
   const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig>(fallbackConfig);
   const [configReady, setConfigReady] = useState(false);
   const [sdk, setSdk] = useState<SkillSdkApi | null>(null);
+  const [mockMode] = useState<MockMode>(initialMockMode);
   const [conversations, setConversations] = useState<ChatConversation[]>(seededConversations);
   const [selectedConversationId, setSelectedConversationId] = useState<string>(
     seededConversations[0].id
@@ -114,19 +122,36 @@ export default function App() {
       return;
     }
 
-    const sharedSdk = getSharedBrowserSkillSdk({
-      baseUrl: runtimeConfig.baseUrl,
-      wsUrl: runtimeConfig.wsUrl
-    });
+    const sharedSdk =
+      mockMode === "json"
+        ? getSharedFixtureBrowserSkillSdk({
+            runtimeKey: mockFixture.runtimeKey,
+            fixtureData: mockFixture
+          })
+        : getSharedBrowserSkillSdk({
+            baseUrl: runtimeConfig.baseUrl,
+            wsUrl: runtimeConfig.wsUrl
+          });
 
     sdkRef.current = sharedSdk;
     setSdk(sharedSdk);
-  }, [configReady, runtimeConfig.baseUrl, runtimeConfig.wsUrl]);
+  }, [configReady, mockMode, runtimeConfig.baseUrl, runtimeConfig.wsUrl]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadRuntimeConfig() {
+      if (mockMode === "json") {
+        if (!cancelled) {
+          setRuntimeConfig({
+            baseUrl: mockFixture.displayBaseUrl ?? "mock-json://fixture",
+            wsUrl: mockFixture.displayWsUrl ?? "mock-json://fixture/ws"
+          });
+          setConfigReady(true);
+        }
+        return;
+      }
+
       try {
         const response = await fetch(`/mock-server-runtime.json?t=${Date.now()}`);
 
@@ -158,7 +183,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [mockMode]);
 
   useEffect(() => {
     if (!sdk) {
@@ -436,9 +461,27 @@ export default function App() {
           </div>
           <div className="sidebar-runtime">
             <span>{configReady ? "Mock 已连接" : "读取配置中"}</span>
+            <strong>{mockMode === "json" ? "Mock JSON" : "Mock Server"}</strong>
             <strong>{runtimeConfig.baseUrl.replace("http://", "")}</strong>
           </div>
         </header>
+
+        <div className="mock-mode-switch">
+          <button
+            type="button"
+            className={mockMode === "server" ? "active" : ""}
+            onClick={() => switchMockMode("server")}
+          >
+            Mock Server
+          </button>
+          <button
+            type="button"
+            className={mockMode === "json" ? "active" : ""}
+            onClick={() => switchMockMode("json")}
+          >
+            Mock JSON
+          </button>
+        </div>
 
         <div className="conversation-list">
           {conversations.map((conversation) => {
@@ -517,6 +560,7 @@ export default function App() {
                 sessionId={selectedConversation.welinkSessionId}
                 baseUrl={runtimeConfig.baseUrl}
                 wsUrl={runtimeConfig.wsUrl}
+                mockMode={mockMode}
               />
             </div>
           ) : null}
@@ -672,6 +716,23 @@ function parseSkillCommand(input: string): SkillCommand | null {
     skillName: match[1],
     prompt: match[2]
   };
+}
+
+function getInitialMockMode(): MockMode {
+  const params = new URLSearchParams(window.location.search);
+  const candidate = params.get("mockMode");
+
+  if (candidate === "json" || candidate === "server") {
+    return candidate;
+  }
+
+  return mockFixture.defaultMode === "json" ? "json" : "server";
+}
+
+function switchMockMode(nextMode: MockMode): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set("mockMode", nextMode);
+  window.location.assign(url.toString());
 }
 
 function getConversationPreview(conversation: ChatConversation): string {

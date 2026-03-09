@@ -94,6 +94,27 @@ button {
   overflow: auto;
 }
 
+.mock-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 12px 0;
+}
+
+.mock-mode-switch button {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.mock-mode-switch button.active {
+  background: rgba(7, 193, 96, 0.18);
+  color: #d9ffe9;
+  border-color: rgba(7, 193, 96, 0.28);
+}
+
 .conversation-item {
   width: 100%;
   border: 0;

@@ -16,5 +16,5 @@
     "baseUrl": ".",
     "types": ["vite/client"]
   },
-  "include": ["src", "test-app"]
+  "include": ["src", "test-app", "mocks/**/*.ts", "mocks/**/*.json"]
 }
