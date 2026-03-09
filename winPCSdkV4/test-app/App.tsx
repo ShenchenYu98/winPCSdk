@@ -31,6 +31,7 @@ interface ChatConversation {
   sessionStatus: SessionStatus;
   showSkillBar: boolean;
   isMiniAppOpen: boolean;
+  messageSurface: "host" | "miniapp";
   messages: SessionMessage[];
   streamEvents: StreamMessage[];
   imMessages: string[];
@@ -218,7 +219,10 @@ export default function App() {
       updateConversation(conversationId, (conversation) => ({
         ...conversation,
         streamEvents: [...conversation.streamEvents.slice(-11), message],
-        messages: applyStreamMessage(conversation.messages, message),
+        messages:
+          conversation.messageSurface === "host"
+            ? applyStreamMessage(conversation.messages, message)
+            : conversation.messages,
         lastActivityAt: message.emittedAt
       }));
     };
@@ -250,7 +254,7 @@ export default function App() {
         welinkSessionId: sessionId,
         content: pendingMessage
       });
-    } else {
+    } else if (selectedConversation.messageSurface === "host") {
       void refreshConversationHistory(conversationId, sessionId);
     }
 
@@ -287,18 +291,17 @@ export default function App() {
       return;
     }
 
-    const rawInput = selectedConversation.draft.trim();
     const existingSessionId = selectedConversation.welinkSessionId;
     const hasReusableSession =
       existingSessionId !== null && selectedConversation.activeSkillName === command.skillName;
 
     setBusyConversationId(selectedConversation.id);
-    appendOptimisticMessage(selectedConversation.id, rawInput, existingSessionId ?? -1);
     updateConversation(selectedConversation.id, (conversation) => ({
       ...conversation,
       draft: "",
       activeSkillName: command.skillName,
       showSkillBar: true,
+      messageSurface: "miniapp",
       sessionStatus: "executing",
       lastActivityAt: new Date().toISOString()
     }));
@@ -355,7 +358,9 @@ export default function App() {
     const defaultSkill = selectedConversation.activeSkillName ?? "assistant";
 
     setBusyConversationId(selectedConversation.id);
-    appendOptimisticMessage(selectedConversation.id, content, existingSessionId ?? -1);
+    if (selectedConversation.messageSurface === "host") {
+      appendOptimisticMessage(selectedConversation.id, content, existingSessionId ?? -1);
+    }
     updateConversation(selectedConversation.id, (conversation) => ({
       ...conversation,
       draft: "",
@@ -425,7 +430,7 @@ export default function App() {
 
     updateConversation(conversationId, (conversation) => ({
       ...conversation,
-      messages: result.content
+      messages: conversation.messageSurface === "host" ? result.content : conversation.messages
     }));
   }
 
@@ -649,6 +654,7 @@ function createConversationSeed(seed: {
     sessionStatus: "completed",
     showSkillBar: false,
     isMiniAppOpen: false,
+    messageSurface: "host",
     messages: seed.messages,
     streamEvents: [],
     imMessages: [],
@@ -736,6 +742,10 @@ function switchMockMode(nextMode: MockMode): void {
 }
 
 function getConversationPreview(conversation: ChatConversation): string {
+  if (conversation.messageSurface === "miniapp" && conversation.activeSkillName) {
+    return `/${conversation.activeSkillName} 对话在 MiniApp 中继续`;
+  }
+
   const lastMessage = conversation.messages[conversation.messages.length - 1];
 
   if (lastMessage?.content) {

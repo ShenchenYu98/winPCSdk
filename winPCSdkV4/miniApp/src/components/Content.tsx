@@ -66,15 +66,13 @@ const Content: React.FC<ContentProps> = ({
           <div
             key={message.id}
             className={`message-block ${
-              message.role === 'USER' || message.role === 'user'
-                ? 'message-user'
-                : 'message-assistant'
+              message.role === 'USER' ? 'message-user' : 'message-assistant'
             }`}
           >
             <div className="message-content">
               <MarkdownContent content={message.content} />
             </div>
-            {(message.role === 'ASSISTANT' || message.role === 'assistant') && (
+            {message.role === 'ASSISTANT' && (
               <div className="message-actions">
                 <button
                   className="action-btn copy-btn"

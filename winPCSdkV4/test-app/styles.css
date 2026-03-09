@@ -346,19 +346,13 @@ button {
   box-shadow: none;
 }
 
-.miniapp-frame-shell {
+.miniapp-embedded-shell {
   min-height: 620px;
   border-radius: 20px;
   overflow: hidden;
   border: 1px solid rgba(17, 27, 33, 0.08);
   background: #fff;
-}
-
-.miniapp-frame {
-  width: 100%;
-  height: 620px;
-  border: 0;
-  display: block;
+  padding: 0;
 }
 
 .composer-shell {
@@ -444,9 +438,7 @@ button:disabled {
     max-width: 88%;
   }
 
-  .miniapp-frame-shell,
-  .miniapp-frame {
+  .miniapp-embedded-shell {
     min-height: 520px;
-    height: 520px;
   }
 }

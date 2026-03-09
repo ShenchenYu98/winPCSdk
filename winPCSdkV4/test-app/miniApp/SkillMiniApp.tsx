@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import EmbeddedMiniApp from "../../miniApp/src/EmbeddedApp";
 
 interface SkillMiniAppProps {
   sessionId: number | null;
@@ -8,40 +8,25 @@ interface SkillMiniAppProps {
 }
 
 export function SkillMiniApp(props: SkillMiniAppProps) {
-  const iframeSrc = useMemo(() => {
-    const params = new URLSearchParams();
-
-    if (props.sessionId !== null) {
-      params.set("sessionId", String(props.sessionId));
-    }
-
-    params.set("baseUrl", props.baseUrl);
-    params.set("wsUrl", props.wsUrl);
-    params.set("env", "test");
-    params.set("mockMode", props.mockMode);
-
-    return `/miniapp/index.html?${params.toString()}`;
-  }, [props.baseUrl, props.mockMode, props.sessionId, props.wsUrl]);
-
   return (
     <section className="miniapp-panel">
       <header className="miniapp-panel-header">
         <div>
           <p className="miniapp-panel-kicker">MiniApp Project</p>
-          <h3>真实 MiniApp 页面</h3>
+          <h3>真实 MiniApp 组件</h3>
         </div>
         <div className="miniapp-panel-meta">
           <span>Session {props.sessionId ?? "--"}</span>
-          <span>/miniapp/index.html</span>
+          <span>React Mounted</span>
         </div>
       </header>
 
-      <div className="miniapp-frame-shell">
-        <iframe
-          key={iframeSrc}
-          title="Skill MiniApp"
-          className="miniapp-frame"
-          src={iframeSrc}
+      <div className="miniapp-embedded-shell">
+        <EmbeddedMiniApp
+          sessionId={props.sessionId}
+          baseUrl={props.baseUrl}
+          wsUrl={props.wsUrl}
+          mockMode={props.mockMode}
         />
       </div>
     </section>

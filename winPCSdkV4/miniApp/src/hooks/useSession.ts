@@ -59,14 +59,12 @@ export const useSession = ({
       switch (message.type) {
         case 'message.part.delta': {
           const delta = message.properties?.delta || '';
-          const partId = message.properties?.partID || '';
+          const partId = message.properties?.part?.id || 'streaming-part';
           if (delta) {
-            setStreamingContent((prev) => {
-              const current = partBufferRef.current.get(partId) || '';
-              const updated = current + delta;
-              partBufferRef.current.set(partId, updated);
-              return updated;
-            });
+            const current = partBufferRef.current.get(partId) || '';
+            const updated = current + delta;
+            partBufferRef.current.set(partId, updated);
+            setStreamingContent(updated);
           }
           break;
         }

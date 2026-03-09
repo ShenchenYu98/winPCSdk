@@ -6,6 +6,7 @@ import {
 } from "../../../src/sdk";
 import mockFixture from "../../../mocks/mock.json";
 import { getSharedFixtureBrowserSkillSdk } from "../../../mocks/runtime/fixtureSkillSdk";
+import { getEmbeddedMiniAppRuntimeConfig } from "../runtime/embeddedRuntime";
 import type {
   ControlSkillWeCodeParams,
   ControlSkillWeCodeResult,
@@ -46,8 +47,8 @@ const listenerWrappers = new Map<
   Map<RegisterSessionListenerParams["onMessage"], WrappedListener>
 >();
 const runtimeRouting = detectRuntimeRouting();
-const mockMode = resolveMockModeFromURL();
 let sdkClient: SkillSdkApi | null = null;
+let sdkClientKey: string | null = null;
 
 function detectRuntimeRouting(): RuntimeRouting {
   if (typeof window === "undefined") {
@@ -86,7 +87,11 @@ function checkJSAPI(): boolean {
 }
 
 function getSdkClient(): SkillSdkApi {
-  if (sdkClient) {
+  const mockMode = resolveMockMode();
+  const sdkOptions = resolveSdkOptions();
+  const cacheKey = `${mockMode}:${sdkOptions.baseUrl}:${sdkOptions.wsUrl}`;
+
+  if (sdkClient && sdkClientKey === cacheKey) {
     return sdkClient;
   }
 
@@ -96,15 +101,24 @@ function getSdkClient(): SkillSdkApi {
           runtimeKey: mockFixture.runtimeKey,
           fixtureData: mockFixture
         })
-      : getSharedBrowserSkillSdk(resolveSdkOptionsFromURL());
+      : getSharedBrowserSkillSdk(sdkOptions);
+  sdkClientKey = cacheKey;
   return sdkClient;
 }
 
-function resolveSdkOptionsFromURL(): SdkOptions {
+function resolveSdkOptions(): SdkOptions {
   const defaults: SdkOptions = {
     baseUrl: "http://127.0.0.1:19082",
     wsUrl: "ws://127.0.0.1:19082/ws/skill/stream"
   };
+  const embeddedConfig = getEmbeddedMiniAppRuntimeConfig();
+
+  if (embeddedConfig) {
+    return {
+      baseUrl: embeddedConfig.baseUrl,
+      wsUrl: embeddedConfig.wsUrl
+    };
+  }
 
   if (typeof window === "undefined") {
     return defaults;
@@ -139,7 +153,13 @@ function parseSessionId(sessionId: string): number {
   return Number(sessionId);
 }
 
-function resolveMockModeFromURL(): "server" | "json" {
+function resolveMockMode(): "server" | "json" {
+  const embeddedConfig = getEmbeddedMiniAppRuntimeConfig();
+
+  if (embeddedConfig) {
+    return embeddedConfig.mockMode;
+  }
+
   if (typeof window === "undefined") {
     return mockFixture.defaultMode === "json" ? "json" : "server";
   }
@@ -471,6 +491,12 @@ export async function controlSkillWeCode(
 }
 
 export function getSessionIdFromURL(): string | null {
+  const embeddedConfig = getEmbeddedMiniAppRuntimeConfig();
+
+  if (embeddedConfig) {
+    return embeddedConfig.sessionId;
+  }
+
   if (typeof window === "undefined") {
     return null;
   }

@@ -1,6 +1,5 @@
 export type {
   ChatMessage,
-  AIProgressStatus,
   StreamMessage,
   SessionError,
   GetSessionMessageParams,
