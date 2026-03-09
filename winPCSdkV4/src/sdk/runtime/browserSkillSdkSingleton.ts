@@ -1,14 +1,19 @@
-import { createBrowserSkillSdk, type BrowserSkillSdkOptions } from "../browser/createBrowserSkillSdk";
+import {
+  createBrowserSkillSdk,
+  resolveBrowserSkillSdkOptions,
+  type BrowserSkillSdkOptions
+} from "../browser/createBrowserSkillSdk";
 import type { SkillSdkApi } from "../types";
 
 let sharedBrowserSkillSdk: SkillSdkApi | null = null;
 let sharedConfigKey: string | null = null;
 
-export function getSharedBrowserSkillSdk(options: BrowserSkillSdkOptions): SkillSdkApi {
-  const configKey = buildConfigKey(options);
+export function getSharedBrowserSkillSdk(options: BrowserSkillSdkOptions = {}): SkillSdkApi {
+  const resolvedOptions = resolveBrowserSkillSdkOptions(options);
+  const configKey = buildConfigKey(resolvedOptions);
 
   if (!sharedBrowserSkillSdk || sharedConfigKey !== configKey) {
-    sharedBrowserSkillSdk = createBrowserSkillSdk(options);
+    sharedBrowserSkillSdk = createBrowserSkillSdk(resolvedOptions);
     sharedConfigKey = configKey;
   }
 
@@ -20,6 +25,6 @@ export function resetSharedBrowserSkillSdk(): void {
   sharedConfigKey = null;
 }
 
-function buildConfigKey(options: BrowserSkillSdkOptions): string {
+function buildConfigKey(options: { baseUrl: string; wsUrl: string }): string {
   return `${options.baseUrl}::${options.wsUrl}`;
 }

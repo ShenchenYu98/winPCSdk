@@ -3,6 +3,10 @@ import {
   getSharedBrowserSkillSdk,
   resetSharedBrowserSkillSdk
 } from "../../src/sdk/runtime/browserSkillSdkSingleton";
+import {
+  DEFAULT_SKILL_SDK_BASE_URL,
+  DEFAULT_SKILL_SDK_WS_URL
+} from "../../src/sdk/browser/createBrowserSkillSdk";
 
 describe("browserSkillSdkSingleton", () => {
   afterEach(() => {
@@ -33,5 +37,27 @@ describe("browserSkillSdkSingleton", () => {
     });
 
     expect(first).not.toBe(second);
+  });
+
+  it("uses default addresses when no options are provided", () => {
+    const first = getSharedBrowserSkillSdk();
+    const second = getSharedBrowserSkillSdk({
+      baseUrl: DEFAULT_SKILL_SDK_BASE_URL,
+      wsUrl: DEFAULT_SKILL_SDK_WS_URL
+    });
+
+    expect(first).toBe(second);
+  });
+
+  it("fills only the missing address when partial options are provided", () => {
+    const first = getSharedBrowserSkillSdk({
+      baseUrl: "http://localhost:8787"
+    });
+    const second = getSharedBrowserSkillSdk({
+      baseUrl: "http://localhost:8787",
+      wsUrl: DEFAULT_SKILL_SDK_WS_URL
+    });
+
+    expect(first).toBe(second);
   });
 });
