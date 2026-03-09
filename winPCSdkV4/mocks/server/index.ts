@@ -35,6 +35,12 @@ interface SessionMessage {
   createdAt: string;
 }
 
+interface ActiveStream {
+  timers: ReturnType<typeof setTimeout>[];
+  assistantMessageId: number;
+  streamedContent: string;
+}
+
 const app = express();
 app.use((request, response, next) => {
   response.header("Access-Control-Allow-Origin", "*");
@@ -58,6 +64,7 @@ const runtimeConfigPath = path.join(projectRoot, "public", "mock-server-runtime.
 
 const sessions = new Map<number, SkillSession>();
 const sessionMessages = new Map<number, SessionMessage[]>();
+const activeStreams = new Map<number, ActiveStream>();
 const imMessages: string[] = [];
 let sessionIdSeed = 1;
 let messageIdSeed = 1;
@@ -115,8 +122,10 @@ app.post("/api/skill/sessions/:sessionId/messages", (request, response) => {
 });
 
 app.post("/api/skill/sessions/:sessionId/abort", (request, response) => {
+  const sessionId = Number(request.params.sessionId);
+  cancelActiveStream(sessionId, true);
   response.json({
-    welinkSessionId: Number(request.params.sessionId),
+    welinkSessionId: sessionId,
     status: "aborted"
   });
 });
@@ -221,7 +230,7 @@ function createUserMessage(sessionId: number, content: string): SessionMessage {
   };
 }
 
-function createAssistantMessage(sessionId: number, content: string): SessionMessage {
+function createAssistantMessage(sessionId: number, content = ""): SessionMessage {
   const now = new Date().toISOString();
   const list = sessionMessages.get(sessionId) ?? [];
   const id = messageIdSeed++;
@@ -239,13 +248,18 @@ function createAssistantMessage(sessionId: number, content: string): SessionMess
 }
 
 function simulateAssistantStream(sessionId: number, prompt: string): void {
+  cancelActiveStream(sessionId, false);
   const now = new Date().toISOString();
-  const assistant = createAssistantMessage(
-    sessionId,
-    `Request received: "${prompt}". Returning a structured Skill SDK response.`
-  );
+  const assistantContent = `Request received: "${prompt}". Returning a structured Skill SDK response.`;
+  const assistant = createAssistantMessage(sessionId);
   sessionMessages.get(sessionId)?.push(assistant);
-  const textChunks = splitIntoChunks(assistant.content, 14);
+  const textChunks = splitIntoChunks(assistantContent, 14);
+  const activeStream: ActiveStream = {
+    timers: [],
+    assistantMessageId: assistant.id,
+    streamedContent: ""
+  };
+  activeStreams.set(sessionId, activeStream);
 
   const chunks = [
     { type: "step.start", seq: streamSeq++, welinkSessionId: sessionId, emittedAt: now },
@@ -310,7 +324,7 @@ function simulateAssistantStream(sessionId: number, prompt: string): void {
       role: assistant.role,
       partId: `${assistant.id}:text`,
       partSeq: 0,
-      content: assistant.content
+      content: assistantContent
     },
     {
       type: "step.done",
@@ -332,8 +346,83 @@ function simulateAssistantStream(sessionId: number, prompt: string): void {
   ];
 
   [...chunks, ...textDeltaEvents, ...endingEvents].forEach((event, index) => {
-    setTimeout(() => broadcast(event), 220 * (index + 1));
+    const timer = setTimeout(() => {
+      const stream = activeStreams.get(sessionId);
+
+      if (!stream || stream.assistantMessageId !== assistant.id) {
+        return;
+      }
+
+      if (event.type === "text.delta" && "content" in event) {
+        stream.streamedContent += String(event.content ?? "");
+        updateAssistantMessageContent(sessionId, assistant.id, stream.streamedContent);
+      }
+
+      if (event.type === "text.done") {
+        updateAssistantMessageContent(sessionId, assistant.id, assistantContent);
+      }
+
+      broadcast(event);
+
+      if (
+        event.type === "session.status" &&
+        "sessionStatus" in event &&
+        event.sessionStatus === "idle"
+      ) {
+        activeStreams.delete(sessionId);
+      }
+    }, 220 * (index + 1));
+
+    activeStream.timers.push(timer);
   });
+}
+
+function cancelActiveStream(sessionId: number, emitStopped: boolean): void {
+  const activeStream = activeStreams.get(sessionId);
+
+  if (activeStream) {
+    activeStream.timers.forEach((timer) => clearTimeout(timer));
+    activeStreams.delete(sessionId);
+  }
+
+  if (emitStopped && activeStream) {
+    broadcast({
+      type: "error",
+      seq: streamSeq++,
+      welinkSessionId: sessionId,
+      emittedAt: new Date().toISOString(),
+      error: "aborted by user",
+      content: "aborted by user"
+    });
+  }
+}
+
+function updateAssistantMessageContent(
+  sessionId: number,
+  messageId: number,
+  content: string
+): void {
+  const messages = sessionMessages.get(sessionId);
+
+  if (!messages) {
+    return;
+  }
+
+  const target = messages.find((message) => message.id === messageId);
+
+  if (!target) {
+    return;
+  }
+
+  target.content = content;
+  target.parts = [
+    {
+      partId: `${messageId}:text`,
+      partSeq: 0,
+      type: "text",
+      content
+    }
+  ];
 }
 
 function broadcast(payload: Record<string, unknown>): void {

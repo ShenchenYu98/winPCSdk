@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { getSharedBrowserSkillSdk } from "../sdk";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { getSharedBrowserSkillSdk } from "../src/sdk";
 import type {
   SessionMessage,
   SessionMessagePart,
@@ -7,7 +7,7 @@ import type {
   SkillSdkApi,
   SkillWecodeStatus,
   StreamMessage
-} from "../sdk";
+} from "../src/sdk";
 import { SkillMiniApp } from "./miniApp/SkillMiniApp";
 
 interface RuntimeConfig {
