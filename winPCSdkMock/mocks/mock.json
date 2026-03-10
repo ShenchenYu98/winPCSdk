@@ -1,0 +1,24 @@
+{
+  "defaultMode": "server",
+  "runtimeKey": "skill-sdk-fixture-runtime",
+  "displayBaseUrl": "mock-json://fixture",
+  "displayWsUrl": "mock-json://fixture/ws",
+  "chunkSize": 14,
+  "chunkIntervalMs": 220,
+  "sessions": [],
+  "imMessages": [],
+  "templates": {
+    "default": {
+      "responsePrefix": "Request received:",
+      "responseSuffix": "Returning a structured Skill SDK response.",
+      "toolOutput": "Project scaffold generated.",
+      "permissionTitle": "Allow writing files into the local project directory"
+    },
+    "opencode": {
+      "responsePrefix": "OpenCode is processing:",
+      "responseSuffix": "Here is a structured plan and implementation draft.",
+      "toolOutput": "OpenCode workspace scaffold prepared.",
+      "permissionTitle": "Allow OpenCode to update local project files"
+    }
+  }
+}

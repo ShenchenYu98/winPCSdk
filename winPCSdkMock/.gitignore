@@ -1,0 +1,4 @@
+﻿node_modules/
+dist/
+ui-dist/
+.vite/
