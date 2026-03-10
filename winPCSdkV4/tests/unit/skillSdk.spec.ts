@@ -326,6 +326,29 @@ describe("SkillSdk", () => {
       })
     );
   });
+
+  it("adds the fixed cookie header to http requests", async () => {
+    let lastInit: RequestInit | undefined;
+    const fetchMock = vi.fn(async (_input: string | URL, init?: RequestInit) => {
+      lastInit = init;
+      return jsonResponse([]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const sdk = new SkillSdk({
+      baseUrl: "http://localhost:9999",
+      connectionFactory: () => new FakeConnection()
+    });
+
+    await sdk.createSession({
+      ak: "ak",
+      imGroupId: "group"
+    });
+
+    const headers = new Headers(lastInit?.headers);
+
+    expect(headers.get("Cookie")).toBe("cookie1");
+  });
 });
 
 function jsonResponse(payload: unknown): Response {
