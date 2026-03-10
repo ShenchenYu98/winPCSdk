@@ -3,7 +3,7 @@ import type { RealtimeConnection } from "../core/streamConnectionManager";
 import type { SkillSdkApi } from "../types";
 
 export const DEFAULT_SKILL_SDK_BASE_URL = "http://api.openplatform.hisuat.huawei.com/skill/api";
-export const DEFAULT_SKILL_SDK_WS_URL = "ws://api.openplatform.hisuat.huawei.com/skill/api";
+export const DEFAULT_SKILL_SDK_WS_URL = "ws://api.openplatform.hisuat.huawei.com/skill/api/ws/skill/stream";
 
 export interface BrowserSkillSdkOptions {
   baseUrl?: string;
