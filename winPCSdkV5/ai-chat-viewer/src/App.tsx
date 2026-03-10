@@ -3,11 +3,11 @@ import { Header } from './components/Header';
 import { Content } from './components/Content';
 import { Footer } from './components/Footer';
 import { StreamAssembler } from './protocol/StreamAssembler';
-import type { 
-  Message, 
-  StreamMessage, 
-  SessionMessage, 
-  SessionStatus 
+import type {
+  Message,
+  StreamMessage,
+  SessionMessage,
+  SessionStatus,
 } from './types';
 import {
   parseWelinkSessionId,
@@ -15,6 +15,7 @@ import {
   sendMessage as sendMessageApi,
   stopSkill,
   sendMessageToIM,
+  replyPermission,
   controlSkillWeCode,
   registerSessionListener,
   unregisterSessionListener,
@@ -33,7 +34,7 @@ function sessionMessageToMessage(sm: SessionMessage): Message {
     content: sm.content,
     timestamp: new Date(sm.createdAt).getTime(),
     isStreaming: false,
-    parts: sm.parts?.map(p => ({
+    parts: sm.parts?.map((p) => ({
       partId: p.partId,
       type: p.type,
       content: p.content ?? '',
@@ -70,12 +71,14 @@ function App() {
 
   useEffect(() => {
     const sessionId = parseWelinkSessionId();
+
     if (sessionId) {
       setWelinkSessionId(sessionId);
-    } else {
-      setError('缺少 welinkSessionId 参数');
-      setIsLoading(false);
+      return;
     }
+
+    setError('Missing welinkSessionId in URL.');
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
@@ -88,8 +91,7 @@ function App() {
           page: 0,
           size: 50,
         });
-        const convertedMessages = result.content.map(sessionMessageToMessage);
-        setMessages(convertedMessages);
+        setMessages(result.content.map(sessionMessageToMessage));
       } catch (err) {
         console.error('Failed to load messages:', err);
       }
@@ -120,6 +122,7 @@ function App() {
                   : m,
               );
             }
+
             const id = genId();
             streamingMsgIdRef.current = id;
             return [
@@ -164,9 +167,7 @@ function App() {
               const finalParts = assemblerRef.current.getParts();
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === finalId
-                    ? { ...m, isStreaming: false, parts: [...finalParts] }
-                    : m,
+                  m.id === finalId ? { ...m, isStreaming: false, parts: [...finalParts] } : m,
                 ),
               );
             }
@@ -183,13 +184,13 @@ function App() {
 
         case 'session.error':
           setSessionStatus('error');
-          setError(msg.error ?? '会话错误');
+          setError(msg.error ?? 'Session error.');
           assemblerRef.current.reset();
           streamingMsgIdRef.current = null;
           break;
 
         case 'error':
-          setError(msg.error ?? '未知错误');
+          setError(msg.error ?? 'Unknown error.');
           break;
 
         case 'snapshot':
@@ -220,7 +221,7 @@ function App() {
           }
           break;
 
-case 'streaming':
+        case 'streaming':
           if (msg.parts && msg.parts.length > 0) {
             setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
             const id = genId();
@@ -265,30 +266,34 @@ case 'streaming':
       console.log('Session listener closed:', reason);
     };
 
+    const forwardOnMessage = (msg: StreamMessage) => onMessageRef.current?.(msg);
+    const forwardOnError = (err: { errorCode: number; errorMessage: string }) => onErrorRef.current?.(err);
+    const forwardOnClose = (reason: string) => onCloseRef.current?.(reason);
+
     const initSession = async () => {
       await loadMessages();
       setIsLoading(false);
 
-      if (!listenerRegisteredRef.current && welinkSessionId) {
-        registerSessionListener({
+      if (!listenerRegisteredRef.current) {
+        await registerSessionListener({
           welinkSessionId,
-          onMessage: (msg) => onMessageRef.current?.(msg),
-          onError: (err) => onErrorRef.current?.(err),
-          onClose: (reason) => onCloseRef.current?.(reason),
+          onMessage: forwardOnMessage,
+          onError: forwardOnError,
+          onClose: forwardOnClose,
         });
         listenerRegisteredRef.current = true;
       }
     };
 
-    initSession();
+    void initSession();
 
     return () => {
-      if (listenerRegisteredRef.current && welinkSessionId && onMessageRef.current) {
-        unregisterSessionListener({
+      if (listenerRegisteredRef.current) {
+        void unregisterSessionListener({
           welinkSessionId,
-          onMessage: onMessageRef.current,
-          onError: onErrorRef.current ?? undefined,
-          onClose: onCloseRef.current ?? undefined,
+          onMessage: forwardOnMessage,
+          onError: forwardOnError,
+          onClose: forwardOnClose,
         });
         listenerRegisteredRef.current = false;
       }
@@ -297,6 +302,7 @@ case 'streaming':
 
   const handleSendMessage = useCallback(async (content: string) => {
     if (!welinkSessionId || !content.trim()) return;
+
     setError(null);
 
     const userMsg: Message = {
@@ -313,13 +319,14 @@ case 'streaming':
         content: content.trim(),
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : '发送消息失败';
+      const message = err instanceof Error ? err.message : 'Failed to send message.';
       setError(message);
     }
   }, [welinkSessionId]);
 
   const handleStop = useCallback(async () => {
     if (!welinkSessionId) return;
+
     try {
       await stopSkill({ welinkSessionId });
       assemblerRef.current.complete();
@@ -329,16 +336,52 @@ case 'streaming':
     }
   }, [welinkSessionId]);
 
-  const handleSendToIM = useCallback(async (content: string) => {
+  const handleSubmitQuestionAnswer = useCallback(async (content: string, toolCallId?: string) => {
+    if (!welinkSessionId || !content.trim()) return;
+
+    try {
+      await sendMessageApi({
+        welinkSessionId,
+        content: content.trim(),
+        toolCallId,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to submit answer.';
+      setError(message);
+      throw err;
+    }
+  }, [welinkSessionId]);
+
+  const handleReplyPermission = useCallback(async (
+    permId: string,
+    response: 'once' | 'always' | 'reject',
+  ) => {
     if (!welinkSessionId) return;
+
+    try {
+      await replyPermission({
+        welinkSessionId,
+        permId,
+        response,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to reply permission.';
+      setError(message);
+      throw err;
+    }
+  }, [welinkSessionId]);
+
+  const handleSendToIM = useCallback(async (_content: string) => {
+    if (!welinkSessionId) return;
+
     try {
       await sendMessageToIM({
         welinkSessionId,
       });
-      showToast('已发送到IM');
+      showToast('Sent to IM');
     } catch (err) {
       console.error('Failed to send to IM:', err);
-      setError('发送到IM失败');
+      setError('Failed to send to IM.');
     }
   }, [welinkSessionId]);
 
@@ -360,7 +403,7 @@ case 'streaming':
 
   const handleCopy = useCallback((content: string) => {
     navigator.clipboard.writeText(content).then(() => {
-      showToast('已复制到剪贴板');
+      showToast('Copied to clipboard');
     }).catch(() => {
       const textArea = document.createElement('textarea');
       textArea.value = content;
@@ -368,7 +411,7 @@ case 'streaming':
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      showToast('已复制到剪贴板');
+      showToast('Copied to clipboard');
     });
   }, []);
 
@@ -396,16 +439,17 @@ case 'streaming':
       {error && (
         <div className="error-banner">
           {error}
-          <button onClick={() => setError(null)}>✕</button>
+          <button onClick={() => setError(null)}>x</button>
         </div>
       )}
       <div className="content-wrapper">
         <Content
           messages={messages}
-          welinkSessionId={welinkSessionId ?? 0}
           isLoading={isLoading}
           onCopy={handleCopy}
           onSendToIM={handleSendToIM}
+          onSubmitQuestionAnswer={handleSubmitQuestionAnswer}
+          onReplyPermission={handleReplyPermission}
         />
       </div>
       <div className="footer-wrapper">

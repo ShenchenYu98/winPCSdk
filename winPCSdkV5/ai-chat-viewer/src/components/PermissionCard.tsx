@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import type { MessagePart } from '../types';
-import { replyPermission } from '../utils/hwext';
 
 interface PermissionCardProps {
   part: MessagePart;
-  welinkSessionId: number;
+  onReplyPermission: (permId: string, response: 'once' | 'always' | 'reject') => Promise<void>;
   onResolved?: () => void;
 }
 
@@ -19,7 +18,7 @@ const permTypeLabels: Record<string, string> = {
 
 export const PermissionCard: React.FC<PermissionCardProps> = ({
   part,
-  welinkSessionId,
+  onReplyPermission,
   onResolved,
 }) => {
   const [resolved, setResolved] = useState(part.permResolved ?? false);
@@ -29,11 +28,7 @@ export const PermissionCard: React.FC<PermissionCardProps> = ({
     if (resolved || submitting || !part.permissionId) return;
     setSubmitting(true);
     try {
-      await replyPermission({
-        welinkSessionId,
-        permId: part.permissionId,
-        response,
-      });
+      await onReplyPermission(part.permissionId, response);
       setResolved(true);
       onResolved?.();
     } catch (err) {
