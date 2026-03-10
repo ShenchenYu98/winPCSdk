@@ -3,14 +3,12 @@ import '../styles/Footer.less';
 
 interface FooterProps {
   isStreaming: boolean;
-  isLoading?: boolean;
   onSend: (message: string) => void;
   onStop: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   isStreaming,
-  isLoading = false,
   onSend,
   onStop,
 }) => {
@@ -69,7 +67,7 @@ export const Footer: React.FC<FooterProps> = ({
         onKeyDown={handleKeyDown}
         onFocus={handleFocus}
         onBlur={handleBlur}
-        disabled={isStreaming || isLoading}
+        disabled={isStreaming}
       />
       {isStreaming ? (
         <button
@@ -83,7 +81,7 @@ export const Footer: React.FC<FooterProps> = ({
         <button
           className="send-icon-btn"
           onClick={handleSend}
-          disabled={isLoading || !value.trim()}
+          disabled={!value.trim()}
           title="生成"
         >
           <svg

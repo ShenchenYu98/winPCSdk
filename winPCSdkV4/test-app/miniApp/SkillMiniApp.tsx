@@ -133,28 +133,6 @@ export function SkillMiniApp(props: SkillMiniAppProps) {
   );
   const listenerMapRef = useRef<Map<number, WrappedListener>>(new Map());
 
-  useEffect(() => {
-    const previousPedestal = window.Pedestal;
-
-    window.Pedestal = {
-      callMethod: async (methodName: string) => {
-        if (methodName === "getSharedBrowserSkillSdk") {
-          return sdk;
-        }
-
-        if (previousPedestal?.callMethod) {
-          return previousPedestal.callMethod(methodName);
-        }
-
-        throw new Error(`Unsupported Pedestal method: ${methodName}`);
-      }
-    };
-
-    return () => {
-      window.Pedestal = previousPedestal;
-    };
-  }, [sdk]);
-
   const hwBridge = useMemo<ViewerBridge>(
     () => ({
       getSessionMessage: async (params: { welinkSessionId: number; page?: number; size?: number }) =>
@@ -162,6 +140,8 @@ export function SkillMiniApp(props: SkillMiniAppProps) {
           ...result,
           content: result.content.map(mapSessionMessage)
         })),
+      regenerateAnswer: async (params: { welinkSessionId: number }) =>
+        sdk.regenerateAnswer(params),
       sendMessage: async (params: {
         welinkSessionId: number;
         content: string;
@@ -206,7 +186,12 @@ export function SkillMiniApp(props: SkillMiniAppProps) {
           onClose: wrapped.onClose
         });
       },
-      unregisterSessionListener: (params: { welinkSessionId: number }) => {
+      unregisterSessionListener: (params: {
+        welinkSessionId: number;
+        onMessage: (msg: AIChatStreamMessage) => void;
+        onError?: (err: { errorCode: number; errorMessage: string }) => void;
+        onClose?: (reason: string) => void;
+      }) => {
         const wrapped = listenerMapRef.current.get(params.welinkSessionId);
 
         if (!wrapped) {
@@ -224,6 +209,31 @@ export function SkillMiniApp(props: SkillMiniAppProps) {
     }),
     [sdk]
   );
+
+  useEffect(() => {
+    const previousPedestal = window.Pedestal;
+    const previousHWH5EXT = (window as Window & { HWH5EXT?: ViewerBridge }).HWH5EXT;
+
+    window.Pedestal = {
+      callMethod: async (methodName: string) => {
+        if (methodName === "getSharedBrowserSkillSdk") {
+          return sdk;
+        }
+
+        if (previousPedestal?.callMethod) {
+          return previousPedestal.callMethod(methodName);
+        }
+
+        throw new Error(`Unsupported Pedestal method: ${methodName}`);
+      }
+    };
+    (window as Window & { HWH5EXT?: ViewerBridge }).HWH5EXT = hwBridge;
+
+    return () => {
+      window.Pedestal = previousPedestal;
+      (window as Window & { HWH5EXT?: ViewerBridge }).HWH5EXT = previousHWH5EXT;
+    };
+  }, [hwBridge, sdk]);
 
   return (
     <section className="miniapp-panel">

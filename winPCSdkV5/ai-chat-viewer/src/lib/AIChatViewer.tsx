@@ -4,14 +4,27 @@ import { Content } from '../components/Content';
 import { Footer } from '../components/Footer';
 import { StreamAssembler } from '../protocol/StreamAssembler';
 import type { Message, StreamMessage, SessionMessage, SessionStatus } from '../types';
-import type { HWH5EXT } from '../utils/hwext';
 import '../styles/App.less';
 
 export interface AIChatViewerProps {
   welinkSessionId: number;
   onMinimize?: () => void;
   onClose?: () => void;
-  HWH5EXT?: HWH5EXT;
+  HWH5EXT?: {
+    getSessionMessage: (params: { welinkSessionId: number; page?: number; size?: number }) => Promise<{ content: SessionMessage[] }>;
+    sendMessage: (params: { welinkSessionId: number; content: string }) => Promise<unknown>;
+    stopSkill: (params: { welinkSessionId: number }) => Promise<unknown>;
+    sendMessageToIM: (params: { welinkSessionId: number }) => Promise<unknown>;
+    controlSkillWeCode: (params: { action: 'close' | 'minimize' }) => Promise<unknown>;
+    replyPermission: (params: { welinkSessionId: number; permId: string; response: 'once' | 'always' | 'reject' }) => Promise<unknown>;
+    registerSessionListener: (params: { 
+      welinkSessionId: number; 
+      onMessage: (msg: StreamMessage) => void;
+      onError?: (err: { errorCode: number; errorMessage: string }) => void;
+      onClose?: (reason: string) => void;
+    }) => void;
+    unregisterSessionListener: (params: { welinkSessionId: number }) => void;
+  };
 }
 
 let nextMsgId = 1;
@@ -67,20 +80,6 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
     : null);
 
   React.useEffect(() => {
-    if (typeof window === 'undefined' || !HWH5EXT) {
-      return;
-    }
-
-    const hostWindow = window as Window & { HWH5EXT?: AIChatViewerProps['HWH5EXT'] };
-    const previousBridge = hostWindow.HWH5EXT;
-    hostWindow.HWH5EXT = HWH5EXT;
-
-    return () => {
-      hostWindow.HWH5EXT = previousBridge;
-    };
-  }, [HWH5EXT]);
-
-  React.useEffect(() => {
     if (!welinkSessionId || !hw) return;
 
     const loadMessages = async () => {
@@ -125,23 +124,6 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
           break;
         }
 
-        case 'step.start':
-          setSessionStatus('busy');
-          break;
-
-        case 'step.done':
-          if (streamingMsgIdRef.current && msg.tokens) {
-            const finalId = streamingMsgIdRef.current;
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === finalId
-                  ? { ...m, meta: { ...m.meta, tokens: msg.tokens, cost: msg.cost } }
-                  : m,
-              ),
-            );
-          }
-          break;
-
         case 'session.status': {
           if (msg.sessionStatus === 'idle') {
             assemblerRef.current.complete();
@@ -157,8 +139,6 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
             streamingMsgIdRef.current = null;
           } else if (msg.sessionStatus === 'busy') {
             setSessionStatus('busy');
-          } else if (msg.sessionStatus === 'retry') {
-            setSessionStatus('retry');
           }
           break;
         }
@@ -192,73 +172,28 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
             })));
           }
           break;
-
-        case 'streaming':
-          if (msg.parts && msg.parts.length > 0) {
-            setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
-            const id = genId();
-            streamingMsgIdRef.current = id;
-            const streamingMessage: Message = {
-              id,
-              role: (msg.role as Message['role']) ?? 'assistant',
-              content: '',
-              timestamp: Date.now(),
-              isStreaming: true,
-              parts: msg.parts.map((p) => ({
-                partId: p.partId,
-                type: p.type,
-                content: p.content ?? '',
-                isStreaming: true,
-                toolName: p.toolName,
-                toolCallId: p.toolCallId,
-                toolStatus: p.status as 'pending' | 'running' | 'completed' | 'error' | undefined,
-                header: p.header,
-                question: p.question,
-                options: p.options,
-                fileName: p.fileName,
-                fileUrl: p.fileUrl,
-                fileMime: p.fileMime,
-              })),
-            };
-
-            setMessages((prev) => [...prev, streamingMessage]);
-          }
-          break;
-
-        default:
-          break;
       }
     };
 
-    const handleError = (err: { errorCode: number; errorMessage: string }) =>
-      setError(`${err.errorCode}: ${err.errorMessage}`);
-
     const init = async () => {
+      await loadMessages();
+      setIsLoading(false);
       if (!listenerRegisteredRef.current) {
         hw.registerSessionListener({
           welinkSessionId,
           onMessage: handleMessage,
-          onError: handleError,
+          onError: (err: { errorCode: number; errorMessage: string }) => 
+            setError(`${err.errorCode}: ${err.errorMessage}`),
         });
         listenerRegisteredRef.current = true;
       }
-
-      try {
-        await loadMessages();
-      } finally {
-        setIsLoading(false);
-      }
     };
 
-    void init();
+    init();
 
     return () => {
       if (listenerRegisteredRef.current && hw) {
-        hw.unregisterSessionListener({
-          welinkSessionId,
-          onMessage: handleMessage,
-          onError: handleError,
-        });
+        hw.unregisterSessionListener({ welinkSessionId });
         listenerRegisteredRef.current = false;
       }
     };
@@ -329,12 +264,7 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
         onCopy={handleCopy}
         onSendToIM={handleSendToIM}
       />
-      <Footer
-        isStreaming={sessionStatus === 'busy'}
-        isLoading={isLoading}
-        onSend={handleSend}
-        onStop={handleStop}
-      />
+      <Footer isStreaming={sessionStatus === 'busy'} onSend={handleSend} onStop={handleStop} />
     </div>
   );
 };
