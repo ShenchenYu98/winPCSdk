@@ -347,7 +347,7 @@ describe("SkillSdk", () => {
 
     const headers = new Headers(lastInit?.headers);
 
-    expect(headers.get("Cookie")).toBe("cookie1");
+    expect(headers.get("cookie")).toBe("userId=1");
   });
 });
 
