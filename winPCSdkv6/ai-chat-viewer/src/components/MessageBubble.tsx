@@ -11,10 +11,9 @@ import type { Message, MessagePart } from '../types';
 
 interface MessageBubbleProps {
   message: Message;
+  welinkSessionId: number;
   onCopy?: (content: string) => void;
   onSendToIM?: (content: string) => void;
-  onSubmitQuestionAnswer: (content: string, toolCallId?: string) => Promise<void>;
-  onReplyPermission: (permId: string, response: 'once' | 'always' | 'reject') => Promise<void>;
 }
 
 const roleLabels: Record<string, string> = {
@@ -26,10 +25,9 @@ const roleLabels: Record<string, string> = {
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
+  welinkSessionId,
   onCopy,
   onSendToIM,
-  onSubmitQuestionAnswer,
-  onReplyPermission,
 }) => {
   const isUser = message.role === 'user';
 
@@ -78,7 +76,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           <QuestionCard
             key={part.partId}
             part={part}
-            onSubmitAnswer={onSubmitQuestionAnswer}
+            welinkSessionId={welinkSessionId}
           />
         );
 
@@ -87,7 +85,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           <PermissionCard
             key={part.partId}
             part={part}
-            onReplyPermission={onReplyPermission}
+            welinkSessionId={welinkSessionId}
           />
         );
 

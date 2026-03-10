@@ -4,16 +4,38 @@ import { Content } from '../components/Content';
 import { Footer } from '../components/Footer';
 import { StreamAssembler } from '../protocol/StreamAssembler';
 import type { Message, StreamMessage, SessionMessage, SessionStatus } from '../types';
-import type { HWH5EXT } from '../utils/hwext';
-import { resolveRuntimeBridge } from '../utils/hwext';
 import '../styles/App.less';
 
 export interface AIChatViewerProps {
   welinkSessionId: number;
   onMinimize?: () => void;
   onClose?: () => void;
-  HWH5EXT?: HWH5EXT;
+  HWH5EXT?: {
+    getSessionMessage: (params: {
+      welinkSessionId: number;
+      page?: number;
+      size?: number;
+    }) => Promise<{ content: SessionMessage[] }>;
+    sendMessage: (params: { welinkSessionId: number; content: string }) => Promise<unknown>;
+    stopSkill: (params: { welinkSessionId: number }) => Promise<unknown>;
+    sendMessageToIM: (params: { welinkSessionId: number }) => Promise<unknown>;
+    controlSkillWeCode: (params: { action: 'close' | 'minimize' }) => Promise<unknown>;
+    replyPermission: (params: {
+      welinkSessionId: number;
+      permId: string;
+      response: 'once' | 'always' | 'reject';
+    }) => Promise<unknown>;
+    registerSessionListener: (params: {
+      welinkSessionId: number;
+      onMessage: (msg: StreamMessage) => void;
+      onError?: (err: { errorCode: number; errorMessage: string }) => void;
+      onClose?: (reason: string) => void;
+    }) => void;
+    unregisterSessionListener: (params: { welinkSessionId: number }) => void;
+  };
 }
+
+type HwBridge = NonNullable<AIChatViewerProps['HWH5EXT']>;
 
 let nextMsgId = 1;
 function genId(): string {
@@ -48,11 +70,19 @@ function sessionMessageToMessage(sm: SessionMessage): Message {
   };
 }
 
+function getWindowBridge(): HwBridge | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return (window as unknown as { HWH5EXT?: HwBridge }).HWH5EXT ?? null;
+}
+
 const AIChatViewer: React.FC<AIChatViewerProps> = ({
   welinkSessionId,
   onMinimize,
   onClose,
-  HWH5EXT: bridgeOverride,
+  HWH5EXT,
 }) => {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [sessionStatus, setSessionStatus] = React.useState<SessionStatus>('idle');
@@ -62,14 +92,31 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
   const assemblerRef = React.useRef(new StreamAssembler());
   const streamingMsgIdRef = React.useRef<string | null>(null);
   const listenerRegisteredRef = React.useRef(false);
-  const bridgePromise = React.useMemo(() => resolveRuntimeBridge(bridgeOverride), [bridgeOverride]);
+
+  const resolveHwBridge = React.useCallback((): HwBridge | null => {
+    return HWH5EXT ?? getWindowBridge();
+  }, [HWH5EXT]);
 
   React.useEffect(() => {
-    if (!welinkSessionId) {
+    const hw = resolveHwBridge();
+
+    if (!welinkSessionId || !hw) {
+      setIsLoading(false);
+      if (!welinkSessionId) {
+        setError('Missing welinkSessionId');
+      }
       return;
     }
 
-    let disposed = false;
+    const loadMessages = async () => {
+      try {
+        const result = await hw.getSessionMessage({ welinkSessionId, page: 0, size: 50 });
+        setMessages(result.content.map(sessionMessageToMessage));
+      } catch (err) {
+        console.error('Failed to load messages:', err);
+        setError('Failed to load messages');
+      }
+    };
 
     const handleMessage = (msg: StreamMessage) => {
       switch (msg.type) {
@@ -139,39 +186,46 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
 
         case 'session.error':
           setSessionStatus('error');
-          setError(msg.error ?? 'Session error.');
+          setError(msg.error ?? 'Session error');
           assemblerRef.current.reset();
           streamingMsgIdRef.current = null;
           break;
 
         case 'error':
-          setError(msg.error ?? 'Unknown error.');
+          setError(msg.error ?? 'Unknown error');
           break;
 
         case 'snapshot':
           if (msg.messages && msg.messages.length > 0) {
-            setMessages(msg.messages.map((sm) => ({
-              id: sm.id,
-              role: sm.role as Message['role'],
-              content: sm.content,
-              timestamp: sm.createdAt ? new Date(sm.createdAt).getTime() : Date.now(),
-              isStreaming: false,
-              parts: sm.parts?.map((p) => ({
-                partId: p.partId,
-                type: p.type,
-                content: p.content ?? '',
+            setMessages(
+              msg.messages.map((sm) => ({
+                id: sm.id,
+                role: sm.role as Message['role'],
+                content: sm.content,
+                timestamp: sm.createdAt ? new Date(sm.createdAt).getTime() : Date.now(),
                 isStreaming: false,
-                toolName: p.toolName,
-                toolCallId: p.toolCallId,
-                toolStatus: p.status as 'pending' | 'running' | 'completed' | 'error' | undefined,
-                header: p.header,
-                question: p.question,
-                options: p.options,
-                fileName: p.fileName,
-                fileUrl: p.fileUrl,
-                fileMime: p.fileMime,
+                parts: sm.parts?.map((p) => ({
+                  partId: p.partId,
+                  type: p.type,
+                  content: p.content ?? '',
+                  isStreaming: false,
+                  toolName: p.toolName,
+                  toolCallId: p.toolCallId,
+                  toolStatus: p.status as
+                    | 'pending'
+                    | 'running'
+                    | 'completed'
+                    | 'error'
+                    | undefined,
+                  header: p.header,
+                  question: p.question,
+                  options: p.options,
+                  fileName: p.fileName,
+                  fileUrl: p.fileUrl,
+                  fileMime: p.fileMime,
+                })),
               })),
-            })));
+            );
           }
           break;
 
@@ -180,166 +234,107 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
       }
     };
 
-    const onError = (err: { errorCode: number; errorMessage: string }) => {
-      setError(`${err.errorCode}: ${err.errorMessage}`);
-    };
-
-    const onClose = (_reason: string) => {
-      // no-op
-    };
-
     const init = async () => {
-      try {
-        const bridge = await bridgePromise;
-        const result = await bridge.getSessionMessage({ welinkSessionId, page: 0, size: 50 });
+      await loadMessages();
+      setIsLoading(false);
 
-        if (disposed) {
-          return;
-        }
-
-        setMessages(result.content.map(sessionMessageToMessage));
-        setIsLoading(false);
-
-        if (!listenerRegisteredRef.current) {
-          bridge.registerSessionListener({
-            welinkSessionId,
-            onMessage: handleMessage,
-            onError,
-            onClose,
-          });
-          listenerRegisteredRef.current = true;
-        }
-      } catch (err) {
-        if (!disposed) {
-          setIsLoading(false);
-          setError(err instanceof Error ? err.message : 'Failed to load session.');
-        }
+      if (!listenerRegisteredRef.current) {
+        hw.registerSessionListener({
+          welinkSessionId,
+          onMessage: handleMessage,
+          onError: (err: { errorCode: number; errorMessage: string }) => {
+            setError(`${err.errorCode}: ${err.errorMessage}`);
+          },
+        });
+        listenerRegisteredRef.current = true;
       }
     };
 
     void init();
 
     return () => {
-      disposed = true;
-      void bridgePromise.then((bridge) => {
-        if (listenerRegisteredRef.current) {
-          bridge.unregisterSessionListener({
-            welinkSessionId,
-            onMessage: handleMessage,
-            onError,
-            onClose,
-          });
-          listenerRegisteredRef.current = false;
-        }
-      });
+      if (listenerRegisteredRef.current) {
+        hw.unregisterSessionListener({ welinkSessionId });
+        listenerRegisteredRef.current = false;
+      }
     };
-  }, [bridgePromise, welinkSessionId]);
+  }, [welinkSessionId, resolveHwBridge]);
 
-  const handleSend = React.useCallback(async (content: string) => {
-    if (!welinkSessionId || !content.trim()) return;
+  const handleSend = React.useCallback(
+    async (content: string) => {
+      const hw = resolveHwBridge();
+      if (!welinkSessionId || !hw || !content.trim()) {
+        return;
+      }
 
-    setError(null);
-    setMessages((prev) => [...prev, {
-      id: genId(),
-      role: 'user',
-      content: content.trim(),
-      timestamp: Date.now(),
-    }]);
+      setError(null);
+      setMessages((prev) => [
+        ...prev,
+        { id: genId(), role: 'user', content: content.trim(), timestamp: Date.now() },
+      ]);
 
-    try {
-      const bridge = await bridgePromise;
-      await bridge.sendMessage({ welinkSessionId, content: content.trim() });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message.');
-    }
-  }, [bridgePromise, welinkSessionId]);
+      try {
+        await hw.sendMessage({ welinkSessionId, content: content.trim() });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to send message');
+      }
+    },
+    [welinkSessionId, resolveHwBridge],
+  );
 
   const handleStop = React.useCallback(async () => {
-    if (!welinkSessionId) return;
+    const hw = resolveHwBridge();
+    if (!welinkSessionId || !hw) {
+      return;
+    }
 
     try {
-      const bridge = await bridgePromise;
-      await bridge.stopSkill({ welinkSessionId });
+      await hw.stopSkill({ welinkSessionId });
       assemblerRef.current.complete();
       setSessionStatus('idle');
     } catch (err) {
       console.error('Failed to stop skill:', err);
     }
-  }, [bridgePromise, welinkSessionId]);
+  }, [welinkSessionId, resolveHwBridge]);
 
-  const handleSubmitQuestionAnswer = React.useCallback(async (content: string, toolCallId?: string) => {
-    if (!welinkSessionId || !content.trim()) return;
-
-    try {
-      const bridge = await bridgePromise;
-      await bridge.sendMessage({
-        welinkSessionId,
-        content: content.trim(),
-        toolCallId,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to submit answer.';
-      setError(message);
-      throw err;
+  const handleSendToIM = React.useCallback(async () => {
+    const hw = resolveHwBridge();
+    if (!welinkSessionId || !hw) {
+      return;
     }
-  }, [bridgePromise, welinkSessionId]);
-
-  const handleReplyPermission = React.useCallback(async (
-    permId: string,
-    response: 'once' | 'always' | 'reject',
-  ) => {
-    if (!welinkSessionId) return;
 
     try {
-      const bridge = await bridgePromise;
-      await bridge.replyPermission({
-        welinkSessionId,
-        permId,
-        response,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to reply permission.';
-      setError(message);
-      throw err;
-    }
-  }, [bridgePromise, welinkSessionId]);
-
-  const handleSendToIM = React.useCallback(async (_content: string) => {
-    if (!welinkSessionId) return;
-
-    try {
-      const bridge = await bridgePromise;
-      await bridge.sendMessageToIM({ welinkSessionId });
+      await hw.sendMessageToIM({ welinkSessionId });
     } catch {
-      setError('Failed to send to IM.');
+      setError('Failed to send to IM');
     }
-  }, [bridgePromise, welinkSessionId]);
+  }, [welinkSessionId, resolveHwBridge]);
 
   const handleCopy = React.useCallback((content: string) => {
     navigator.clipboard.writeText(content);
   }, []);
 
   const handleMinimize = React.useCallback(async () => {
-    try {
-      const bridge = await bridgePromise;
-      await bridge.controlSkillWeCode({ action: 'minimize' });
-    } catch {
-      // ignore host-side failures and still notify consumer
+    const hw = resolveHwBridge();
+    if (hw) {
+      try {
+        await hw.controlSkillWeCode({ action: 'minimize' });
+      } catch {}
     }
 
     onMinimize?.();
-  }, [bridgePromise, onMinimize]);
+  }, [onMinimize, resolveHwBridge]);
 
   const handleClose = React.useCallback(async () => {
-    try {
-      const bridge = await bridgePromise;
-      await bridge.controlSkillWeCode({ action: 'close' });
-    } catch {
-      // ignore host-side failures and still notify consumer
+    const hw = resolveHwBridge();
+    if (hw) {
+      try {
+        await hw.controlSkillWeCode({ action: 'close' });
+      } catch {}
     }
 
     onClose?.();
-  }, [bridgePromise, onClose]);
+  }, [onClose, resolveHwBridge]);
 
   return (
     <div className="ai-chat-viewer-container">
@@ -352,11 +347,10 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
       )}
       <Content
         messages={messages}
+        welinkSessionId={welinkSessionId}
         isLoading={isLoading}
         onCopy={handleCopy}
         onSendToIM={handleSendToIM}
-        onSubmitQuestionAnswer={handleSubmitQuestionAnswer}
-        onReplyPermission={handleReplyPermission}
       />
       <Footer isStreaming={sessionStatus === 'busy'} onSend={handleSend} onStop={handleStop} />
     </div>

@@ -3,11 +3,11 @@ import { Header } from './components/Header';
 import { Content } from './components/Content';
 import { Footer } from './components/Footer';
 import { StreamAssembler } from './protocol/StreamAssembler';
-import type {
-  Message,
-  StreamMessage,
-  SessionMessage,
-  SessionStatus,
+import type { 
+  Message, 
+  StreamMessage, 
+  SessionMessage, 
+  SessionStatus 
 } from './types';
 import {
   parseWelinkSessionId,
@@ -15,7 +15,6 @@ import {
   sendMessage as sendMessageApi,
   stopSkill,
   sendMessageToIM,
-  replyPermission,
   controlSkillWeCode,
   registerSessionListener,
   unregisterSessionListener,
@@ -34,7 +33,7 @@ function sessionMessageToMessage(sm: SessionMessage): Message {
     content: sm.content,
     timestamp: new Date(sm.createdAt).getTime(),
     isStreaming: false,
-    parts: sm.parts?.map((p) => ({
+    parts: sm.parts?.map(p => ({
       partId: p.partId,
       type: p.type,
       content: p.content ?? '',
@@ -71,14 +70,12 @@ function App() {
 
   useEffect(() => {
     const sessionId = parseWelinkSessionId();
-
     if (sessionId) {
       setWelinkSessionId(sessionId);
-      return;
+    } else {
+      setError('缺少 welinkSessionId 参数');
+      setIsLoading(false);
     }
-
-    setError('Missing welinkSessionId in URL.');
-    setIsLoading(false);
   }, []);
 
   useEffect(() => {
@@ -91,7 +88,8 @@ function App() {
           page: 0,
           size: 50,
         });
-        setMessages(result.content.map(sessionMessageToMessage));
+        const convertedMessages = result.content.map(sessionMessageToMessage);
+        setMessages(convertedMessages);
       } catch (err) {
         console.error('Failed to load messages:', err);
       }
@@ -122,7 +120,6 @@ function App() {
                   : m,
               );
             }
-
             const id = genId();
             streamingMsgIdRef.current = id;
             return [
@@ -167,7 +164,9 @@ function App() {
               const finalParts = assemblerRef.current.getParts();
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === finalId ? { ...m, isStreaming: false, parts: [...finalParts] } : m,
+                  m.id === finalId
+                    ? { ...m, isStreaming: false, parts: [...finalParts] }
+                    : m,
                 ),
               );
             }
@@ -184,13 +183,13 @@ function App() {
 
         case 'session.error':
           setSessionStatus('error');
-          setError(msg.error ?? 'Session error.');
+          setError(msg.error ?? '会话错误');
           assemblerRef.current.reset();
           streamingMsgIdRef.current = null;
           break;
 
         case 'error':
-          setError(msg.error ?? 'Unknown error.');
+          setError(msg.error ?? '未知错误');
           break;
 
         case 'snapshot':
@@ -221,7 +220,7 @@ function App() {
           }
           break;
 
-        case 'streaming':
+case 'streaming':
           if (msg.parts && msg.parts.length > 0) {
             setSessionStatus(msg.sessionStatus === 'busy' ? 'busy' : 'idle');
             const id = genId();
@@ -266,34 +265,30 @@ function App() {
       console.log('Session listener closed:', reason);
     };
 
-    const forwardOnMessage = (msg: StreamMessage) => onMessageRef.current?.(msg);
-    const forwardOnError = (err: { errorCode: number; errorMessage: string }) => onErrorRef.current?.(err);
-    const forwardOnClose = (reason: string) => onCloseRef.current?.(reason);
-
     const initSession = async () => {
       await loadMessages();
       setIsLoading(false);
 
-      if (!listenerRegisteredRef.current) {
-        await registerSessionListener({
+      if (!listenerRegisteredRef.current && welinkSessionId) {
+        registerSessionListener({
           welinkSessionId,
-          onMessage: forwardOnMessage,
-          onError: forwardOnError,
-          onClose: forwardOnClose,
+          onMessage: (msg) => onMessageRef.current?.(msg),
+          onError: (err) => onErrorRef.current?.(err),
+          onClose: (reason) => onCloseRef.current?.(reason),
         });
         listenerRegisteredRef.current = true;
       }
     };
 
-    void initSession();
+    initSession();
 
     return () => {
-      if (listenerRegisteredRef.current) {
-        void unregisterSessionListener({
+      if (listenerRegisteredRef.current && welinkSessionId && onMessageRef.current) {
+        unregisterSessionListener({
           welinkSessionId,
-          onMessage: forwardOnMessage,
-          onError: forwardOnError,
-          onClose: forwardOnClose,
+          onMessage: onMessageRef.current,
+          onError: onErrorRef.current ?? undefined,
+          onClose: onCloseRef.current ?? undefined,
         });
         listenerRegisteredRef.current = false;
       }
@@ -302,7 +297,6 @@ function App() {
 
   const handleSendMessage = useCallback(async (content: string) => {
     if (!welinkSessionId || !content.trim()) return;
-
     setError(null);
 
     const userMsg: Message = {
@@ -319,14 +313,13 @@ function App() {
         content: content.trim(),
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to send message.';
+      const message = err instanceof Error ? err.message : '发送消息失败';
       setError(message);
     }
   }, [welinkSessionId]);
 
   const handleStop = useCallback(async () => {
     if (!welinkSessionId) return;
-
     try {
       await stopSkill({ welinkSessionId });
       assemblerRef.current.complete();
@@ -336,52 +329,16 @@ function App() {
     }
   }, [welinkSessionId]);
 
-  const handleSubmitQuestionAnswer = useCallback(async (content: string, toolCallId?: string) => {
-    if (!welinkSessionId || !content.trim()) return;
-
-    try {
-      await sendMessageApi({
-        welinkSessionId,
-        content: content.trim(),
-        toolCallId,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to submit answer.';
-      setError(message);
-      throw err;
-    }
-  }, [welinkSessionId]);
-
-  const handleReplyPermission = useCallback(async (
-    permId: string,
-    response: 'once' | 'always' | 'reject',
-  ) => {
+  const handleSendToIM = useCallback(async (content: string) => {
     if (!welinkSessionId) return;
-
-    try {
-      await replyPermission({
-        welinkSessionId,
-        permId,
-        response,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to reply permission.';
-      setError(message);
-      throw err;
-    }
-  }, [welinkSessionId]);
-
-  const handleSendToIM = useCallback(async (_content: string) => {
-    if (!welinkSessionId) return;
-
     try {
       await sendMessageToIM({
         welinkSessionId,
       });
-      showToast('Sent to IM');
+      showToast('已发送到IM');
     } catch (err) {
       console.error('Failed to send to IM:', err);
-      setError('Failed to send to IM.');
+      setError('发送到IM失败');
     }
   }, [welinkSessionId]);
 
@@ -403,7 +360,7 @@ function App() {
 
   const handleCopy = useCallback((content: string) => {
     navigator.clipboard.writeText(content).then(() => {
-      showToast('Copied to clipboard');
+      showToast('已复制到剪贴板');
     }).catch(() => {
       const textArea = document.createElement('textarea');
       textArea.value = content;
@@ -411,7 +368,7 @@ function App() {
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      showToast('Copied to clipboard');
+      showToast('已复制到剪贴板');
     });
   }, []);
 
@@ -439,17 +396,16 @@ function App() {
       {error && (
         <div className="error-banner">
           {error}
-          <button onClick={() => setError(null)}>x</button>
+          <button onClick={() => setError(null)}>✕</button>
         </div>
       )}
       <div className="content-wrapper">
         <Content
           messages={messages}
+          welinkSessionId={welinkSessionId ?? 0}
           isLoading={isLoading}
           onCopy={handleCopy}
           onSendToIM={handleSendToIM}
-          onSubmitQuestionAnswer={handleSubmitQuestionAnswer}
-          onReplyPermission={handleReplyPermission}
         />
       </div>
       <div className="footer-wrapper">

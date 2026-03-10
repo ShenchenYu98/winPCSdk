@@ -5,20 +5,18 @@ import '../styles/Content.less';
 
 interface ContentProps {
   messages: Message[];
+  welinkSessionId: number;
   isLoading: boolean;
   onCopy: (content: string) => void;
   onSendToIM: (content: string) => void;
-  onSubmitQuestionAnswer: (content: string, toolCallId?: string) => Promise<void>;
-  onReplyPermission: (permId: string, response: 'once' | 'always' | 'reject') => Promise<void>;
 }
 
 export const Content: React.FC<ContentProps> = ({
   messages,
+  welinkSessionId,
   isLoading,
   onCopy,
   onSendToIM,
-  onSubmitQuestionAnswer,
-  onReplyPermission,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -60,10 +58,9 @@ export const Content: React.FC<ContentProps> = ({
           <MessageBubble
             key={message.id}
             message={message}
+            welinkSessionId={welinkSessionId}
             onCopy={onCopy}
             onSendToIM={onSendToIM}
-            onSubmitQuestionAnswer={onSubmitQuestionAnswer}
-            onReplyPermission={onReplyPermission}
           />
         ))}
         <div ref={bottomRef} />

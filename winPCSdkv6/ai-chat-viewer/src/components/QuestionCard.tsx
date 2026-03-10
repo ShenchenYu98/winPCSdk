@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import type { MessagePart } from '../types';
+import { sendMessage } from '../utils/hwext';
 
 interface QuestionCardProps {
   part: MessagePart;
-  onSubmitAnswer: (content: string, toolCallId?: string) => Promise<void>;
+  welinkSessionId: number;
   onAnswered?: () => void;
 }
 
 export const QuestionCard: React.FC<QuestionCardProps> = ({ 
   part, 
-  onSubmitAnswer,
+  welinkSessionId,
   onAnswered 
 }) => {
   const [customInput, setCustomInput] = useState('');
@@ -20,7 +21,11 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     if (answered || submitting) return;
     setSubmitting(true);
     try {
-      await onSubmitAnswer(option, part.toolCallId);
+      await sendMessage({
+        welinkSessionId,
+        content: option,
+        toolCallId: part.toolCallId,
+      });
       setAnswered(true);
       onAnswered?.();
     } catch (err) {
@@ -34,7 +39,11 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     if (answered || submitting || !customInput.trim()) return;
     setSubmitting(true);
     try {
-      await onSubmitAnswer(customInput.trim(), part.toolCallId);
+      await sendMessage({
+        welinkSessionId,
+        content: customInput.trim(),
+        toolCallId: part.toolCallId,
+      });
       setAnswered(true);
       onAnswered?.();
     } catch (err) {
