@@ -45,10 +45,26 @@ interface SkillCommand {
 
 type MockMode = "server" | "json";
 
+function resolveProxyBaseUrl(): string {
+  if (typeof window === "undefined") {
+    return "http://localhost:5173";
+  }
+
+  return window.location.origin;
+}
+
+function resolveProxyWsUrl(): string {
+  if (typeof window === "undefined") {
+    return "ws://localhost:5173/ws/skill/stream";
+  }
+
+  const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${wsProtocol}//${window.location.host}/ws/skill/stream`;
+}
+
 const fallbackConfig: RuntimeConfig = {
-  baseUrl: import.meta.env.VITE_SKILL_SERVER_BASE_URL ?? "http://localhost:8787",
-  wsUrl:
-    import.meta.env.VITE_SKILL_SERVER_WS_URL ?? "ws://localhost:8787/ws/skill/stream"
+  baseUrl: import.meta.env.VITE_SKILL_SERVER_BASE_URL ?? resolveProxyBaseUrl(),
+  wsUrl: import.meta.env.VITE_SKILL_SERVER_WS_URL ?? resolveProxyWsUrl()
 };
 
 const seededConversations: ChatConversation[] = [
@@ -148,6 +164,14 @@ export default function App() {
             baseUrl: mockFixture.displayBaseUrl ?? "mock-json://fixture",
             wsUrl: mockFixture.displayWsUrl ?? "mock-json://fixture/ws"
           });
+          setConfigReady(true);
+        }
+        return;
+      }
+
+      if (import.meta.env.VITE_SKILL_SERVER_BASE_URL || import.meta.env.VITE_SKILL_SERVER_WS_URL) {
+        if (!cancelled) {
+          setRuntimeConfig(fallbackConfig);
           setConfigReady(true);
         }
         return;

@@ -2,3 +2,4 @@
 dist/
 ui-dist/
 .vite/
+.env.local
