@@ -1,5 +1,5 @@
 {
-  "port": 57508,
-  "baseUrl": "http://localhost:57508",
-  "wsUrl": "ws://localhost:57508/ws/skill/stream"
+  "port": 61214,
+  "baseUrl": "http://localhost:61214",
+  "wsUrl": "ws://localhost:61214/ws/skill/stream"
 }

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Header } from './components/Header';
 import { Content } from './components/Content';
 import { Footer } from './components/Footer';
@@ -54,6 +54,19 @@ function sessionMessageToMessage(sm: SessionMessage): Message {
   };
 }
 
+function mergeHistoryMessages(current: Message[], history: Message[]): Message[] {
+  const currentById = new Map(current.map((message) => [message.id, message]));
+  const merged = history.map((message) => currentById.get(message.id) ?? message);
+
+  for (const message of current) {
+    if (message.isStreaming && !merged.some((candidate) => candidate.id === message.id)) {
+      merged.push(message);
+    }
+  }
+
+  return merged.sort((left, right) => left.timestamp - right.timestamp);
+}
+
 function App() {
   const [welinkSessionId, setWelinkSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -89,7 +102,7 @@ function App() {
           size: 50,
         });
         const convertedMessages = result.content.map(sessionMessageToMessage);
-        setMessages(convertedMessages);
+        setMessages((current) => mergeHistoryMessages(current, convertedMessages));
       } catch (err) {
         console.error('Failed to load messages:', err);
       }
@@ -114,11 +127,29 @@ function App() {
 
           setMessages((prev) => {
             if (streamingMsgIdRef.current) {
-              return prev.map((m) =>
-                m.id === streamingMsgIdRef.current
-                  ? { ...m, content: currentText, parts: [...currentParts], isStreaming: true }
-                  : m,
+              const hasStreamingMessage = prev.some(
+                (message) => message.id === streamingMsgIdRef.current,
               );
+
+              if (hasStreamingMessage) {
+                return prev.map((m) =>
+                  m.id === streamingMsgIdRef.current
+                    ? { ...m, content: currentText, parts: [...currentParts], isStreaming: true }
+                    : m,
+                );
+              }
+
+              return [
+                ...prev,
+                {
+                  id: streamingMsgIdRef.current,
+                  role: 'assistant',
+                  content: currentText,
+                  timestamp: Date.now(),
+                  isStreaming: true,
+                  parts: [...currentParts],
+                },
+              ];
             }
             const id = genId();
             streamingMsgIdRef.current = id;
@@ -266,9 +297,6 @@ case 'streaming':
     };
 
     const initSession = async () => {
-      await loadMessages();
-      setIsLoading(false);
-
       if (!listenerRegisteredRef.current && welinkSessionId) {
         registerSessionListener({
           welinkSessionId,
@@ -278,6 +306,9 @@ case 'streaming':
         });
         listenerRegisteredRef.current = true;
       }
+
+      await loadMessages();
+      setIsLoading(false);
     };
 
     initSession();
@@ -329,7 +360,7 @@ case 'streaming':
     }
   }, [welinkSessionId]);
 
-  const handleSendToIM = useCallback(async (content: string) => {
+  const handleSendToIM = useCallback(async (_content: string) => {
     if (!welinkSessionId) return;
     try {
       await sendMessageToIM({
@@ -411,6 +442,7 @@ case 'streaming':
       <div className="footer-wrapper">
         <Footer
           isStreaming={isStreaming}
+          isLoading={isLoading}
           onSend={handleSendMessage}
           onStop={handleStop}
         />

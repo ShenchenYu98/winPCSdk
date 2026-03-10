@@ -10,6 +10,7 @@ import type {
   StopSkillResponse,
   StreamMessage
 } from "../types";
+import { getEmbeddedAIChatViewerRuntimeConfig } from "../runtime/embeddedRuntime";
 
 export interface HWH5EXTError {
   errorCode: number;
@@ -227,11 +228,11 @@ function getHWH5EXT(): HWH5EXT {
 }
 
 async function getPcSdk(): Promise<PcSkillSdk> {
-  if (typeof window === "undefined" || !window.Pedestal?.callMethod) {
-    throw new Error("Pedestal.callMethod 不可用，无法获取 PC SDK 实例");
-  }
-
   if (!pcSdkPromise) {
+    if (typeof window === "undefined" || !window.Pedestal?.callMethod) {
+      throw new Error("Pedestal.callMethod 不可用，无法获取 PC SDK 实例");
+    }
+
     pcSdkPromise = window.Pedestal.callMethod("getSharedBrowserSkillSdk") as Promise<PcSkillSdk>;
   }
 
@@ -432,14 +433,18 @@ export function unregisterSessionListener(params: RegisterSessionListenerParams)
 
   listenerWrappers.delete(params.welinkSessionId);
 
-  void getPcSdk().then((sdk) => {
-    sdk.unregisterSessionListener({
-      welinkSessionId: params.welinkSessionId,
-      onMessage: wrapped.onMessage,
-      onError: wrapped.onError,
-      onClose: wrapped.onClose
+  void getPcSdk()
+    .then((sdk) => {
+      sdk.unregisterSessionListener({
+        welinkSessionId: params.welinkSessionId,
+        onMessage: wrapped.onMessage,
+        onError: wrapped.onError,
+        onClose: wrapped.onClose
+      });
+    })
+    .catch(() => {
+      // Ignore teardown-time bridge unavailability.
     });
-  });
 }
 
 export async function sendMessage(params: SendMessageParams): Promise<SendMessageResponse> {
@@ -516,6 +521,12 @@ export function onSkillWecodeStatusChange(callback: SkillWeCodeStatusChangeCallb
 }
 
 export function parseWelinkSessionId(): number | null {
+  const embeddedConfig = getEmbeddedAIChatViewerRuntimeConfig();
+
+  if (embeddedConfig) {
+    return embeddedConfig.welinkSessionId;
+  }
+
   if (typeof window === "undefined") {
     return null;
   }

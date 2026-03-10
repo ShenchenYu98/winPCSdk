@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from "react";
-import AIChatViewer from "../../ai-chat-viewer/src/lib/AIChatViewer";
-import type { AIChatViewerProps } from "../../ai-chat-viewer/src/lib/AIChatViewer";
+import { useLayoutEffect, useMemo, useRef } from "react";
+import EmbeddedAIChatViewerApp from "../../ai-chat-viewer/src/EmbeddedApp";
+import type { HWH5EXT } from "../../ai-chat-viewer/src/utils/hwext";
 import type {
   SessionMessage as AIChatSessionMessage,
   SessionMessagePart as AIChatSessionMessagePart,
@@ -38,7 +38,7 @@ type WrappedListener = {
   onClose?: (reason: string) => void;
 };
 
-type ViewerBridge = NonNullable<AIChatViewerProps["HWH5EXT"]>;
+type ViewerBridge = HWH5EXT;
 
 function mapSessionMessagePart(part: SessionMessagePart): AIChatSessionMessagePart {
   return {
@@ -210,7 +210,7 @@ export function SkillMiniApp(props: SkillMiniAppProps) {
     [sdk]
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previousPedestal = window.Pedestal;
     const previousHWH5EXT = (window as Window & { HWH5EXT?: ViewerBridge }).HWH5EXT;
 
@@ -250,7 +250,7 @@ export function SkillMiniApp(props: SkillMiniAppProps) {
 
       <div className="miniapp-embedded-shell">
         {props.sessionId !== null ? (
-          <AIChatViewer welinkSessionId={props.sessionId} HWH5EXT={hwBridge} />
+          <EmbeddedAIChatViewerApp welinkSessionId={props.sessionId} />
         ) : null}
       </div>
     </section>

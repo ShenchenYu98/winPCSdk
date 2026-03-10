@@ -22,6 +22,17 @@ interface SessionMessagePart {
   partSeq: number;
   type: "text" | "thinking" | "tool" | "question" | "permission" | "file";
   content?: string;
+  toolName?: string;
+  toolCallId?: string;
+  toolStatus?: string;
+  toolInput?: Record<string, unknown>;
+  toolOutput?: string;
+  question?: string;
+  options?: string[];
+  permissionId?: string;
+  fileName?: string;
+  fileUrl?: string;
+  fileMime?: string;
 }
 
 interface SessionMessage {
@@ -242,7 +253,14 @@ function createAssistantMessage(sessionId: number, content = ""): SessionMessage
     role: "assistant",
     content,
     messageSeq: list.length + 1,
-    parts: [{ partId: `${id}:text`, partSeq: 0, type: "text", content }],
+    parts: [
+      {
+        partId: `${id}:text`,
+        partSeq: 0,
+        type: "text",
+        content
+      }
+    ],
     createdAt: now
   };
 }
@@ -353,14 +371,7 @@ function simulateAssistantStream(sessionId: number, prompt: string): void {
         return;
       }
 
-      if (event.type === "text.delta" && "content" in event) {
-        stream.streamedContent += String(event.content ?? "");
-        updateAssistantMessageContent(sessionId, assistant.id, stream.streamedContent);
-      }
-
-      if (event.type === "text.done") {
-        updateAssistantMessageContent(sessionId, assistant.id, assistantContent);
-      }
+      applyEventToAssistantMessage(sessionId, assistant.id, event, stream, assistantContent);
 
       broadcast(event);
 
@@ -415,14 +426,77 @@ function updateAssistantMessageContent(
   }
 
   target.content = content;
-  target.parts = [
-    {
-      partId: `${messageId}:text`,
-      partSeq: 0,
-      type: "text",
-      content
-    }
-  ];
+  upsertMessagePart(target, {
+    partId: `${messageId}:text`,
+    partSeq: 0,
+    type: "text",
+    content
+  });
+}
+
+function applyEventToAssistantMessage(
+  sessionId: number,
+  messageId: number,
+  event: Record<string, unknown>,
+  stream: ActiveStream,
+  finalAssistantContent: string
+): void {
+  const messages = sessionMessages.get(sessionId);
+  const target = messages?.find((message) => message.id === messageId);
+
+  if (!target) {
+    return;
+  }
+
+  if (event.type === "tool.update") {
+    upsertMessagePart(target, {
+      partId: String(event.partId),
+      partSeq: Number(event.partSeq ?? 0),
+      type: "tool",
+      toolName: typeof event.toolName === "string" ? event.toolName : undefined,
+      toolCallId: typeof event.toolCallId === "string" ? event.toolCallId : undefined,
+      toolStatus: typeof event.status === "string" ? event.status : undefined,
+      toolOutput: typeof event.output === "string" ? event.output : undefined,
+      content: typeof event.output === "string" ? event.output : undefined
+    });
+    return;
+  }
+
+  if (event.type === "permission.ask") {
+    upsertMessagePart(target, {
+      partId: String(event.partId),
+      partSeq: Number(event.partSeq ?? 0),
+      type: "permission",
+      permissionId: typeof event.permissionId === "string" ? event.permissionId : undefined,
+      content: typeof event.title === "string" ? event.title : undefined
+    });
+    return;
+  }
+
+  if (event.type === "text.delta") {
+    stream.streamedContent += String(event.content ?? "");
+    updateAssistantMessageContent(sessionId, messageId, stream.streamedContent);
+    return;
+  }
+
+  if (event.type === "text.done") {
+    updateAssistantMessageContent(sessionId, messageId, finalAssistantContent);
+  }
+}
+
+function upsertMessagePart(message: SessionMessage, nextPart: SessionMessagePart): void {
+  const index = message.parts.findIndex((part) => part.partId === nextPart.partId);
+
+  if (index === -1) {
+    message.parts.push(nextPart);
+  } else {
+    message.parts[index] = {
+      ...message.parts[index],
+      ...nextPart
+    };
+  }
+
+  message.parts.sort((left, right) => left.partSeq - right.partSeq);
 }
 
 function broadcast(payload: Record<string, unknown>): void {
