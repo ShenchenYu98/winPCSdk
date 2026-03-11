@@ -23,8 +23,8 @@ export interface AIChatViewerProps {
       onMessage: (msg: StreamMessage) => void;
       onError?: (err: { errorCode: number; errorMessage: string }) => void;
       onClose?: (reason: string) => void;
-    }) => void;
-    unregisterSessionListener: (params: { welinkSessionId: number }) => void;
+    }) => void | Promise<void>;
+    unregisterSessionListener: (params: { welinkSessionId: number }) => void | Promise<void>;
   };
 }
 

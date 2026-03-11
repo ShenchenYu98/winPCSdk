@@ -285,13 +285,18 @@ function App() {
       setIsLoading(false);
 
       if (!listenerRegisteredRef.current && welinkSessionId && onMessageRef.current) {
-        registerSessionListener({
-          welinkSessionId,
-          onMessage: onMessageRef.current,
-          onError: onErrorRef.current ?? undefined,
-          onClose: onCloseRef.current ?? undefined,
-        });
-        listenerRegisteredRef.current = true;
+        try {
+          await registerSessionListener({
+            welinkSessionId,
+            onMessage: onMessageRef.current,
+            onError: onErrorRef.current ?? undefined,
+            onClose: onCloseRef.current ?? undefined,
+          });
+          listenerRegisteredRef.current = true;
+        } catch (err) {
+          console.error('Failed to register session listener:', err);
+          setError('注册会话监听失败');
+        }
       }
     };
 
@@ -299,11 +304,13 @@ function App() {
 
     return () => {
       if (listenerRegisteredRef.current && welinkSessionId && onMessageRef.current) {
-        unregisterSessionListener({
+        void unregisterSessionListener({
           welinkSessionId,
           onMessage: onMessageRef.current,
           onError: onErrorRef.current ?? undefined,
           onClose: onCloseRef.current ?? undefined,
+        }).catch((err) => {
+          console.error('Failed to unregister session listener:', err);
         });
         listenerRegisteredRef.current = false;
       }
