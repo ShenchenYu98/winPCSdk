@@ -70,7 +70,6 @@ export interface HWH5EXT {
   stopSkill(params: StopSkillParams): Promise<StopSkillResponse>;
   replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResponse>;
   controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse>;
-  onSkillWecodeStatusChange?: (callback: SkillWeCodeStatusChangeCallback) => void;
 }
 
 declare global {
@@ -106,8 +105,9 @@ export async function getSessionMessage(params: GetSessionMessageParams): Promis
   return sdk.getSessionMessage(params);
 }
 
-export function registerSessionListener(params: RegisterSessionListenerParams): void {
-  return getHWH5EXT().registerSessionListener(params);
+export function registerSessionListener(params: any): void {
+  const sdk = getSharedBrowserSkillSdk();
+  return sdk.registerSessionListener(params);
 }
 
 export function unregisterSessionListener(params: any): void {
@@ -133,13 +133,6 @@ export async function replyPermission(params: ReplyPermissionParams): Promise<Re
 export async function controlSkillWeCode(params: ControlSkillWeCodeParams): Promise<ControlSkillWeCodeResponse> {
   const sdk = await getPCSdk();
   return sdk.controlSkillWeCode(params);
-}
-
-export function onSkillWecodeStatusChange(callback: any): void {
-  const hwext = getHWH5EXT();
-  if (hwext.onSkillWecodeStatusChange) {
-    hwext.onSkillWecodeStatusChange(callback);
-  }
 }
 
 export function parseWelinkSessionId(): number | null {

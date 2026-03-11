@@ -132,22 +132,26 @@ const AIChatViewer: React.FC<AIChatViewerProps> = ({
           assemblerRef.current.handleMessage(msg);
           const currentText = assemblerRef.current.getText();
           const currentParts = assemblerRef.current.getParts();
+          const streamingMsgId = streamingMsgIdRef.current ?? genId();
+          const hasStreamingMessage = streamingMsgIdRef.current !== null;
+
+          if (!hasStreamingMessage) {
+            streamingMsgIdRef.current = streamingMsgId;
+          }
 
           setMessages((prev) => {
-            if (streamingMsgIdRef.current) {
+            if (hasStreamingMessage) {
               return prev.map((m) =>
-                m.id === streamingMsgIdRef.current
+                m.id === streamingMsgId
                   ? { ...m, content: currentText, parts: [...currentParts], isStreaming: true }
                   : m,
               );
             }
 
-            const id = genId();
-            streamingMsgIdRef.current = id;
             return [
               ...prev,
               {
-                id,
+                id: streamingMsgId,
                 role: 'assistant',
                 content: currentText,
                 timestamp: Date.now(),
