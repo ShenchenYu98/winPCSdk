@@ -1,22 +1,30 @@
-import type { PageResult, SessionMessage, SessionMessagePart, StreamMessage } from "../types";
+import type {
+  PageResult,
+  SessionMessage,
+  SessionMessagePart,
+  SessionRole,
+  StreamMessage
+} from "../types";
 
 interface CachedMessage {
-  id: number | string;
-  welinkSessionId: number;
-  userId: string | null;
-  role: SessionMessage["role"];
-  content: string;
-  messageSeq: number;
+  id: string;
+  seq: number | null;
+  welinkSessionId: string;
+  role: SessionRole;
+  content: string | null;
+  contentType: string | null;
+  meta?: Record<string, unknown> | null;
+  messageSeq: number | null;
   parts?: Map<string, SessionMessagePart>;
   createdAt: string;
 }
 
 export class MessageCacheStore {
-  private readonly sessions = new Map<number, Map<string, CachedMessage>>();
-  private readonly finalTexts = new Map<number, Map<string, string>>();
-  private readonly orderedMessageIds = new Map<number, string[]>();
+  private readonly sessions = new Map<string, Map<string, CachedMessage>>();
+  private readonly finalTexts = new Map<string, Map<string, string>>();
+  private readonly orderedMessageIds = new Map<string, string[]>();
 
-  applyHistory(sessionId: number, messages: SessionMessage[]): void {
+  applyHistory(sessionId: string, messages: SessionMessage[]): void {
     for (const message of messages) {
       this.upsertSessionMessage(sessionId, message);
     }
@@ -28,29 +36,31 @@ export class MessageCacheStore {
       return;
     }
 
-    if (!message.messageId) {
+    const messageId = message.messageId?.trim();
+
+    if (!messageId) {
       return;
     }
 
     const sessionStore = this.getSessionStore(message.welinkSessionId);
-    const key = String(message.messageId);
-    const cached = sessionStore.get(key) ?? this.createCachedMessage(message);
+    const cached = sessionStore.get(messageId) ?? this.createCachedMessage(message);
+    cached.seq = message.seq ?? cached.seq;
     cached.messageSeq = message.messageSeq ?? cached.messageSeq;
     cached.role = message.role ?? cached.role;
 
     if (message.type === "streaming") {
       this.applyStreamingMessage(cached, message);
       cached.content = buildContent(cached.parts ?? new Map<string, SessionMessagePart>());
-      sessionStore.set(key, cached);
-      this.trackOrder(message.welinkSessionId, key);
+      sessionStore.set(messageId, cached);
+      this.trackOrder(message.welinkSessionId);
       return;
     }
 
     const parts = cached.parts ?? new Map<string, SessionMessagePart>();
-    const partKey = String(message.partId ?? `${message.type}:${message.seq}`);
+    const partKey = String(message.partId ?? `${message.type}:${message.seq ?? "unknown"}`);
     const part = parts.get(partKey) ?? {
       partId: partKey,
-      partSeq: message.partSeq ?? parts.size,
+      partSeq: message.partSeq ?? parts.size + 1,
       type: inferPartType(message.type)
     };
 
@@ -61,38 +71,49 @@ export class MessageCacheStore {
     } else if (message.type === "tool.update") {
       part.toolName = message.toolName;
       part.toolCallId = message.toolCallId;
-      part.toolStatus = message.status;
-      part.toolInput = message.input;
-      part.toolOutput = message.output;
+      part.status = message.status;
+      part.input = message.input;
+      part.output = message.output;
+      part.error = message.error;
+      part.title = message.title;
       part.content = message.output ?? part.content;
     } else if (message.type === "question") {
       part.toolName = message.toolName;
       part.toolCallId = message.toolCallId;
+      part.status = message.status;
+      part.input = message.input;
+      part.header = message.header;
       part.question = message.question;
       part.options = message.options;
-      part.content = message.question;
-    } else if (message.type === "permission.ask") {
+      part.content = message.question ?? part.content;
+    } else if (message.type === "permission.ask" || message.type === "permission.reply") {
       part.permissionId = message.permissionId;
+      part.permType = message.permType;
+      part.metadata = message.metadata;
+      part.response = message.response;
+      part.status = message.status;
+      part.title = message.title;
       part.content = message.title ?? part.content;
     } else if (message.type === "file") {
       part.fileName = message.fileName;
       part.fileUrl = message.fileUrl;
       part.fileMime = message.fileMime;
-      part.content = message.fileName;
+      part.content =
+        buildFileContent(message.fileName ?? undefined, message.fileUrl ?? undefined) ?? part.content;
     }
 
     parts.set(partKey, part);
     cached.parts = parts;
     cached.content = buildContent(parts);
-    sessionStore.set(key, cached);
-    this.trackOrder(message.welinkSessionId, key);
+    sessionStore.set(messageId, cached);
+    this.trackOrder(message.welinkSessionId);
 
-    if (message.type === "text.done" || message.type === "thinking.done" || message.type === "step.done") {
-      this.saveFinalText(message.welinkSessionId, key, cached.content);
+    if (shouldPersistFinalText(message.type, message.status)) {
+      this.saveFinalText(message.welinkSessionId, messageId, cached.content ?? "");
     }
   }
 
-  getMergedMessages(sessionId: number, history: SessionMessage[]): SessionMessage[] {
+  getMergedMessages(sessionId: string, history: SessionMessage[]): SessionMessage[] {
     this.applyHistory(sessionId, history);
     const sessionStore = this.sessions.get(sessionId);
 
@@ -105,7 +126,7 @@ export class MessageCacheStore {
       .map(([, message]) => toSessionMessage(message));
   }
 
-  getFinalText(sessionId: number, messageId?: string): string | undefined {
+  getFinalText(sessionId: string, messageId?: string): string | undefined {
     const sessionTexts = this.finalTexts.get(sessionId);
     const sessionOrder = this.orderedMessageIds.get(sessionId) ?? [];
 
@@ -128,7 +149,15 @@ export class MessageCacheStore {
     return undefined;
   }
 
-  getLastUserMessageContent(sessionId: number): string | undefined {
+  hasMessage(sessionId: string, messageId: string): boolean {
+    return this.sessions.get(sessionId)?.has(messageId) ?? false;
+  }
+
+  hasFinalText(sessionId: string, messageId: string): boolean {
+    return this.finalTexts.get(sessionId)?.has(messageId) ?? false;
+  }
+
+  getLastUserMessageContent(sessionId: string): string | undefined {
     const sessionStore = this.sessions.get(sessionId);
 
     if (!sessionStore) {
@@ -137,40 +166,48 @@ export class MessageCacheStore {
 
     return [...sessionStore.values()]
       .filter((message) => message.role === "user")
-      .sort((left, right) => right.messageSeq - left.messageSeq)[0]?.content;
+      .sort(compareCachedMessagesDescending)[0]?.content ?? undefined;
   }
 
-  toPageResult(sessionId: number, historyPage: PageResult<SessionMessage>): PageResult<SessionMessage> {
+  toPageResult(sessionId: string, historyPage: PageResult<SessionMessage>): PageResult<SessionMessage> {
     const merged = this.getMergedMessages(sessionId, historyPage.content);
-    const start = historyPage.page * historyPage.size;
+    const start = historyPage.number * historyPage.size;
     const end = start + historyPage.size;
 
     return {
       content: merged.slice(start, end),
-      page: historyPage.page,
+      number: historyPage.number,
       size: historyPage.size,
-      total: merged.length
+      totalElements: merged.length
     };
   }
 
-  private upsertSessionMessage(sessionId: number, message: SessionMessage): void {
+  clear(): void {
+    this.sessions.clear();
+    this.finalTexts.clear();
+    this.orderedMessageIds.clear();
+  }
+
+  private upsertSessionMessage(sessionId: string, message: SessionMessage): void {
     const sessionStore = this.getSessionStore(sessionId);
-    const key = String(message.id);
+    const key = message.id;
     const parts = message.parts ?? [];
 
     sessionStore.set(key, {
       id: message.id,
+      seq: message.seq,
       welinkSessionId: message.welinkSessionId,
-      userId: message.userId,
       role: message.role,
       content: message.content,
+      contentType: message.contentType,
+      meta: message.meta,
       messageSeq: message.messageSeq,
       parts: new Map(parts.map((part) => [part.partId, part])),
       createdAt: message.createdAt
     });
-    this.trackOrder(sessionId, key);
+    this.trackOrder(sessionId);
 
-    if (message.content) {
+    if (message.content !== null && message.content !== undefined) {
       this.saveFinalText(sessionId, key, message.content);
     }
   }
@@ -178,13 +215,15 @@ export class MessageCacheStore {
   private createCachedMessage(message: StreamMessage): CachedMessage {
     return {
       id: message.messageId ?? "",
+      seq: message.seq,
       welinkSessionId: message.welinkSessionId,
-      userId: null,
       role: message.role ?? "assistant",
-      content: message.content ?? "",
-      messageSeq: message.messageSeq ?? message.seq,
+      content: message.content ?? null,
+      contentType: null,
+      meta: null,
+      messageSeq: message.messageSeq ?? null,
       parts: new Map(),
-      createdAt: message.emittedAt
+      createdAt: message.emittedAt ?? new Date().toISOString()
     };
   }
 
@@ -203,7 +242,7 @@ export class MessageCacheStore {
     );
   }
 
-  private getSessionStore(sessionId: number): Map<string, CachedMessage> {
+  private getSessionStore(sessionId: string): Map<string, CachedMessage> {
     let sessionStore = this.sessions.get(sessionId);
 
     if (!sessionStore) {
@@ -214,7 +253,7 @@ export class MessageCacheStore {
     return sessionStore;
   }
 
-  private saveFinalText(sessionId: number, messageId: string, content: string): void {
+  private saveFinalText(sessionId: string, messageId: string, content: string): void {
     let sessionTexts = this.finalTexts.get(sessionId);
 
     if (!sessionTexts) {
@@ -225,7 +264,7 @@ export class MessageCacheStore {
     sessionTexts.set(messageId, content);
   }
 
-  private trackOrder(sessionId: number, _messageId: string): void {
+  private trackOrder(sessionId: string): void {
     const sessionStore = this.sessions.get(sessionId);
 
     if (!sessionStore) {
@@ -246,7 +285,25 @@ function compareCachedEntries(
   rightKey: string,
   right: CachedMessage
 ): number {
-  return left.messageSeq - right.messageSeq || leftKey.localeCompare(rightKey);
+  return compareBySequence(left, right) || leftKey.localeCompare(rightKey);
+}
+
+function compareCachedMessagesDescending(left: CachedMessage, right: CachedMessage): number {
+  return compareBySequence(right, left);
+}
+
+function compareBySequence(left: CachedMessage, right: CachedMessage): number {
+  const leftSeq = left.seq ?? Number.MAX_SAFE_INTEGER;
+  const rightSeq = right.seq ?? Number.MAX_SAFE_INTEGER;
+
+  if (leftSeq !== rightSeq) {
+    return leftSeq - rightSeq;
+  }
+
+  const leftMessageSeq = left.messageSeq ?? Number.MAX_SAFE_INTEGER;
+  const rightMessageSeq = right.messageSeq ?? Number.MAX_SAFE_INTEGER;
+
+  return leftMessageSeq - rightMessageSeq;
 }
 
 function inferPartType(type: string): SessionMessagePart["type"] {
@@ -276,14 +333,52 @@ function inferPartType(type: string): SessionMessagePart["type"] {
 function buildContent(parts: Map<string, SessionMessagePart>): string {
   return [...parts.values()]
     .sort((left, right) => left.partSeq - right.partSeq)
-    .map((part) => {
-      if (part.type === "tool") {
-        return part.toolOutput ?? "";
-      }
-
-      return part.content ?? part.question ?? "";
-    })
+    .map(renderPartContent)
     .join("");
+}
+
+function renderPartContent(part: SessionMessagePart): string {
+  if (part.type === "tool") {
+    return part.output ?? part.content ?? part.error ?? "";
+  }
+
+  if (part.type === "question") {
+    const questionText = part.question ?? part.content ?? "";
+    const optionsText = part.options?.length ? ` ${part.options.join(" / ")}` : "";
+    return `${questionText}${optionsText}`.trim();
+  }
+
+  if (part.type === "permission") {
+    const title = part.title ?? part.content ?? "";
+    const response = part.response ? ` ${part.response}` : "";
+    return `${title}${response}`.trim();
+  }
+
+  if (part.type === "file") {
+    return buildFileContent(part.fileName ?? undefined, part.fileUrl ?? undefined) ?? "";
+  }
+
+  return part.content ?? part.question ?? "";
+}
+
+function buildFileContent(fileName?: string, fileUrl?: string): string | undefined {
+  if (fileName && fileUrl) {
+    return `${fileName} ${fileUrl}`;
+  }
+
+  return fileName ?? fileUrl;
+}
+
+function shouldPersistFinalText(type: string, status?: string | null): boolean {
+  if (type === "text.done" || type === "thinking.done" || type === "question" || type === "permission.ask" || type === "permission.reply" || type === "file" || type === "step.done") {
+    return true;
+  }
+
+  if (type === "tool.update" && (status === "completed" || status === "error")) {
+    return true;
+  }
+
+  return false;
 }
 
 function toSessionMessage(message: CachedMessage): SessionMessage {
@@ -293,10 +388,12 @@ function toSessionMessage(message: CachedMessage): SessionMessage {
 
   return {
     id: message.id,
+    seq: message.seq,
     welinkSessionId: message.welinkSessionId,
-    userId: message.userId,
     role: message.role,
     content: message.content,
+    contentType: message.contentType,
+    meta: message.meta,
     messageSeq: message.messageSeq,
     parts,
     createdAt: message.createdAt

@@ -2,13 +2,14 @@ export type SessionStatus = "executing" | "stopped" | "completed";
 export type SkillWecodeStatus = "closed" | "minimized";
 export type SkillWeCodeAction = "close" | "minimize";
 export type PermissionResponse = "once" | "always" | "reject";
+export type SessionRole = "user" | "assistant" | "system" | "tool";
 
 export interface SkillSession {
-  welinkSessionId: number;
+  welinkSessionId: string;
   userId: string;
-  ak: string;
-  title: string;
-  imGroupId: string;
+  ak: string | null;
+  title: string | null;
+  imGroupId: string | null;
   status: string;
   toolSessionId: string | null;
   createdAt: string;
@@ -16,21 +17,21 @@ export interface SkillSession {
 }
 
 export interface CreateSessionParams {
-  ak: string;
+  ak?: string;
   title?: string;
   imGroupId: string;
 }
 
 export interface StopSkillParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
 }
 
 export interface RegenerateAnswerParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
 }
 
 export interface OnSessionStatusChangeParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
   callback: (result: SessionStatusResult) => void;
 }
 
@@ -39,30 +40,30 @@ export interface OnSkillWecodeStatusChangeParams {
 }
 
 export interface GetSessionMessageParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
   page?: number;
   size?: number;
 }
 
 export interface RegisterSessionListenerParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
   onMessage: (message: StreamMessage) => void;
   onError?: (error: SessionError) => void;
   onClose?: (reason: string) => void;
 }
 
 export interface UnregisterSessionListenerParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
 }
 
 export interface SendMessageParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
   content: string;
   toolCallId?: string;
 }
 
 export interface ReplyPermissionParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
   permId: string;
   response: PermissionResponse;
 }
@@ -72,7 +73,7 @@ export interface ControlSkillWeCodeParams {
 }
 
 export interface SendMessageToIMParams {
-  welinkSessionId: number;
+  welinkSessionId: string;
   messageId?: string;
   chatId?: string;
 }
@@ -90,89 +91,101 @@ export interface SDKError {
 
 export interface PageResult<T> {
   content: T[];
-  page: number;
+  number: number;
   size: number;
-  total: number;
+  totalElements: number;
 }
 
 export interface SessionMessagePart {
   partId: string;
   partSeq: number;
   type: "text" | "thinking" | "tool" | "question" | "permission" | "file";
-  content?: string;
-  toolName?: string;
-  toolCallId?: string;
-  toolStatus?: string;
-  toolInput?: Record<string, unknown>;
-  toolOutput?: string;
-  question?: string;
-  options?: string[];
-  permissionId?: string;
-  fileName?: string;
-  fileUrl?: string;
-  fileMime?: string;
+  content?: string | null;
+  toolName?: string | null;
+  toolCallId?: string | null;
+  input?: Record<string, unknown> | null;
+  output?: string | null;
+  error?: string | null;
+  title?: string | null;
+  header?: string | null;
+  question?: string | null;
+  options?: string[] | null;
+  permissionId?: string | null;
+  permType?: string | null;
+  metadata?: Record<string, unknown> | null;
+  response?: PermissionResponse | null;
+  status?: string | null;
+  fileName?: string | null;
+  fileUrl?: string | null;
+  fileMime?: string | null;
 }
 
 export interface SessionMessage {
-  id: number | string;
-  welinkSessionId: number;
-  userId: string | null;
-  role: "user" | "assistant" | "system" | "tool";
-  content: string;
-  messageSeq: number;
-  parts?: SessionMessagePart[];
+  id: string;
+  seq: number | null;
+  welinkSessionId: string;
+  role: SessionRole;
+  content: string | null;
+  contentType: string | null;
+  meta?: Record<string, unknown> | null;
+  messageSeq: number | null;
+  parts?: SessionMessagePart[] | null;
   createdAt: string;
 }
 
 export interface StreamMessage {
   type: string;
-  seq: number;
-  welinkSessionId: number;
-  emittedAt: string;
+  seq: number | null;
+  welinkSessionId: string;
+  emittedAt: string | null;
   raw?: Record<string, unknown>;
-  messageId?: string;
-  messageSeq?: number;
-  role?: "user" | "assistant" | "system" | "tool";
-  partId?: string;
-  partSeq?: number;
-  content?: string;
-  toolName?: string;
-  toolCallId?: string;
-  status?: string;
-  input?: Record<string, unknown>;
-  output?: string;
-  error?: string;
-  title?: string;
-  header?: string;
-  question?: string;
-  options?: string[];
-  fileName?: string;
-  fileUrl?: string;
-  fileMime?: string;
-  tokens?: Record<string, unknown>;
-  cost?: number;
-  reason?: string;
-  sessionStatus?: "busy" | "idle" | "retry";
-  permissionId?: string;
-  permType?: string;
-  metadata?: Record<string, unknown>;
-  response?: PermissionResponse;
-  messages?: SessionMessage[];
-  parts?: SessionMessagePart[];
+  messageId?: string | null;
+  sourceMessageId?: string | null;
+  messageSeq?: number | null;
+  role?: SessionRole | null;
+  partId?: string | null;
+  partSeq?: number | null;
+  content?: string | null;
+  toolName?: string | null;
+  toolCallId?: string | null;
+  status?: string | null;
+  input?: Record<string, unknown> | null;
+  output?: string | null;
+  error?: string | null;
+  title?: string | null;
+  header?: string | null;
+  question?: string | null;
+  options?: string[] | null;
+  fileName?: string | null;
+  fileUrl?: string | null;
+  fileMime?: string | null;
+  tokens?: Record<string, unknown> | null;
+  cost?: number | null;
+  reason?: string | null;
+  sessionStatus?: "busy" | "idle" | "retry" | null;
+  permissionId?: string | null;
+  permType?: string | null;
+  metadata?: Record<string, unknown> | null;
+  response?: PermissionResponse | null;
+  messages?: SessionMessage[] | null;
+  parts?: SessionMessagePart[] | null;
 }
 
 export interface SendMessageResult {
-  id: number;
-  welinkSessionId: number;
-  userId: string;
-  role: "user";
-  content: string;
-  messageSeq: number;
+  id: string;
+  seq: number | null;
+  welinkSessionId: string;
+  role: SessionRole;
+  content: string | null;
+  contentType: string | null;
+  meta?: Record<string, unknown> | null;
+  messageSeq: number | null;
+  parts?: SessionMessagePart[] | null;
   createdAt: string;
 }
 
 export interface StopSkillResult {
-  welinkSessionId: number;
+  welinkSessionId: string;
   status: "aborted";
 }
 
@@ -181,7 +194,7 @@ export interface CloseSkillResult {
 }
 
 export interface ReplyPermissionResult {
-  welinkSessionId: number;
+  welinkSessionId: string;
   permissionId: string;
   response: PermissionResponse;
 }
@@ -191,9 +204,7 @@ export interface ControlSkillWeCodeResult {
 }
 
 export interface SendMessageToIMResult {
-  status: "success" | "failed";
-  chatId?: string;
-  contentLength?: number;
+  success: boolean;
 }
 
 export interface SessionStatusResult {

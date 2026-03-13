@@ -33,19 +33,14 @@ export class SessionOrchestrator {
     this.cacheStore.applyHistory(params.welinkSessionId, [
       {
         id: result.id,
+        seq: result.seq,
         welinkSessionId: result.welinkSessionId,
-        userId: result.userId,
         role: result.role,
         content: result.content,
+        contentType: result.contentType,
+        meta: result.meta,
         messageSeq: result.messageSeq,
-        parts: [
-          {
-            partId: `${result.id}:text`,
-            partSeq: 0,
-            type: "text",
-            content: result.content
-          }
-        ],
+        parts: result.parts,
         createdAt: result.createdAt
       }
     ]);
@@ -64,7 +59,7 @@ export class SessionOrchestrator {
     }
 
     if (!content) {
-      throw createSdkError(4000, "会话不存在或无可重试的用户消息");
+      throw createSdkError(4002, "会话中没有用户消息可用于重新生成");
     }
 
     return this.sendMessage({
@@ -97,18 +92,28 @@ export class SessionOrchestrator {
   async sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult> {
     validateSessionId(params.welinkSessionId);
 
+    if (params.messageId) {
+      if (!this.cacheStore.hasMessage(params.welinkSessionId, params.messageId)) {
+        throw createSdkError(4003, "消息不存在");
+      }
+
+      if (!this.cacheStore.hasFinalText(params.welinkSessionId, params.messageId)) {
+        throw createSdkError(4004, "消息未完成");
+      }
+    }
+
     const content = this.cacheStore.getFinalText(params.welinkSessionId, params.messageId);
 
     if (!content) {
-      throw createSdkError(4000, "未找到可发送的最终消息内容");
+      throw createSdkError(4005, "会话中没有已完成消息");
     }
 
     return this.client.sendMessageToIM(params.welinkSessionId, content, params.chatId);
   }
 }
 
-function validateSessionId(sessionId: number): void {
-  if (!Number.isFinite(sessionId) || sessionId <= 0) {
+function validateSessionId(sessionId: string): void {
+  if (typeof sessionId !== "string" || !sessionId.trim()) {
     throw createSdkError(1000, "无效的参数: welinkSessionId");
   }
 }

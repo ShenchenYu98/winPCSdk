@@ -13,7 +13,7 @@ import type {
 } from "../types";
 
 interface CreateSessionPayload {
-  ak: string;
+  ak?: string;
   title?: string;
   imGroupId: string;
 }
@@ -27,8 +27,15 @@ interface Layer1Response<T> {
 export class SkillServerClient {
   constructor(private readonly baseUrl: string) {}
 
-  async listActiveSessions(imGroupId: string, ak: string): Promise<PageResult<SkillSession>> {
-    const query = new URLSearchParams({ imGroupId, ak, status: "ACTIVE" });
+  async listActiveSessions(imGroupId: string, ak?: string): Promise<PageResult<SkillSession>> {
+    this.validateRequired(imGroupId, "imGroupId");
+
+    const query = new URLSearchParams({ imGroupId, status: "ACTIVE" });
+
+    if (ak?.trim()) {
+      query.set("ak", ak);
+    }
+
     return this.request<PageResult<SkillSession>>(`/api/skill/sessions?${query.toString()}`);
   }
 
@@ -52,7 +59,7 @@ export class SkillServerClient {
     });
   }
 
-  async abortSession(welinkSessionId: number): Promise<StopSkillResult> {
+  async abortSession(welinkSessionId: string): Promise<StopSkillResult> {
     this.validateSessionId(welinkSessionId);
 
     return this.request<StopSkillResult>(`/api/skill/sessions/${welinkSessionId}/abort`, {
@@ -61,7 +68,7 @@ export class SkillServerClient {
   }
 
   async getSessionMessages(
-    welinkSessionId: number,
+    welinkSessionId: string,
     page: number,
     size: number
   ): Promise<PageResult<SessionMessage>> {
@@ -86,39 +93,39 @@ export class SkillServerClient {
   }
 
   async sendMessageToIM(
-    welinkSessionId: number,
+    welinkSessionId: string,
     content: string,
     chatId?: string
   ): Promise<SendMessageToIMResult> {
     this.validateSessionId(welinkSessionId);
     this.validateRequired(content, "content");
 
-    const result = await this.request<{ success: boolean }>(
+    return this.request<SendMessageToIMResult>(
       `/api/skill/sessions/${welinkSessionId}/send-to-im`,
       {
         method: "POST",
         body: JSON.stringify({ content, chatId })
       }
     );
-
-    return {
-      status: result.success ? "success" : "failed"
-    };
   }
 
   async createOrReuseSession(params: CreateSessionParams): Promise<SkillSession> {
-    this.validateRequired(params.ak, "ak");
     this.validateRequired(params.imGroupId, "imGroupId");
 
     const sessions = await this.listActiveSessions(params.imGroupId, params.ak);
-    return (
-      sessions.content[0] ??
-      this.createSession({
-        ak: params.ak,
-        title: params.title,
-        imGroupId: params.imGroupId
-      })
-    );
+    const latestActiveSession = [...sessions.content].sort((left, right) =>
+      right.updatedAt.localeCompare(left.updatedAt)
+    )[0];
+
+    if (latestActiveSession) {
+      return latestActiveSession;
+    }
+
+    return this.createSession({
+      ak: params.ak,
+      title: params.title,
+      imGroupId: params.imGroupId
+    });
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -167,8 +174,8 @@ export class SkillServerClient {
     }
   }
 
-  private validateSessionId(sessionId: number): void {
-    if (!Number.isFinite(sessionId) || sessionId <= 0) {
+  private validateSessionId(sessionId: string): void {
+    if (typeof sessionId !== "string" || !sessionId.trim()) {
       throw createSdkError(1000, "无效的参数: welinkSessionId");
     }
   }

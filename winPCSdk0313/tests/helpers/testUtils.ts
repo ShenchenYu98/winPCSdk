@@ -41,12 +41,14 @@ export class MockRealtimeConnection implements RealtimeConnection {
     | {
         onMessage: (payload: unknown) => void;
         onError: (error: Error) => void;
-        onClose: (reason: string) => void;
+        onClose: (reason: string, details?: { reconnecting: boolean }) => void;
+        onReconnect: () => void;
       }
     | null = null;
 
   connectCalls = 0;
   closeCalls = 0;
+  sendCalls: string[] = [];
 
   async connect(): Promise<void> {
     this.connectCalls += 1;
@@ -56,10 +58,15 @@ export class MockRealtimeConnection implements RealtimeConnection {
     this.closeCalls += 1;
   }
 
+  send(payload: string): void {
+    this.sendCalls.push(payload);
+  }
+
   setHandlers(handlers: {
     onMessage: (payload: unknown) => void;
     onError: (error: Error) => void;
-    onClose: (reason: string) => void;
+    onClose: (reason: string, details?: { reconnecting: boolean }) => void;
+    onReconnect: () => void;
   }): void {
     this.handlers = handlers;
   }
@@ -81,11 +88,19 @@ export class MockRealtimeConnection implements RealtimeConnection {
     this.handlers.onError(new Error(message));
   }
 
-  emitClose(reason: string): void {
+  emitClose(reason: string, reconnecting = false): void {
     if (!this.handlers) {
       throw new Error("Connection handlers are not registered");
     }
 
-    this.handlers.onClose(reason);
+    this.handlers.onClose(reason, { reconnecting });
+  }
+
+  emitReconnect(): void {
+    if (!this.handlers) {
+      throw new Error("Connection handlers are not registered");
+    }
+
+    this.handlers.onReconnect();
   }
 }

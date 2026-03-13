@@ -1,3 +1,4 @@
+import { createSdkError } from "../errors";
 import type {
   ControlSkillWeCodeResult,
   SkillWecodeStatus,
@@ -9,6 +10,10 @@ export class MiniappBridge {
   private readonly callbacks = new Set<(result: SkillWecodeStatusResult) => void>();
 
   onStatusChange(callback: (result: SkillWecodeStatusResult) => void): void {
+    if (typeof callback !== "function") {
+      throw createSdkError(1000, "无效的参数: callback");
+    }
+
     this.callbacks.add(callback);
   }
 

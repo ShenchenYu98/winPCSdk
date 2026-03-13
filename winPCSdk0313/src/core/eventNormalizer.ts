@@ -19,9 +19,9 @@ export function normalizeStreamMessage(payload: unknown): StreamMessage {
   return {
     ...record,
     type: String(record.type ?? "unknown"),
-    seq: Number(record.seq ?? 0),
-    welinkSessionId: Number(record.welinkSessionId),
-    emittedAt: String(record.emittedAt ?? new Date().toISOString()),
+    seq: typeof record.seq === "number" ? record.seq : null,
+    welinkSessionId: String(record.welinkSessionId ?? ""),
+    emittedAt: typeof record.emittedAt === "string" ? record.emittedAt : null,
     raw: record.raw && typeof record.raw === "object" ? (record.raw as Record<string, unknown>) : record
   } as StreamMessage;
 }

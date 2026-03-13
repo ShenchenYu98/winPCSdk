@@ -12,19 +12,22 @@ import type {
 export interface RealtimeConnection {
   connect(): Promise<void>;
   close(): void;
+  send?(payload: string): void;
   setHandlers(handlers: {
     onMessage: (payload: unknown) => void;
     onError: (error: Error) => void;
-    onClose: (reason: string) => void;
+    onClose: (reason: string, details?: { reconnecting: boolean }) => void;
+    onReconnect: () => void;
   }): void;
 }
 
 type Listener = RegisterSessionListenerParams;
 
 export class StreamConnectionManager {
-  private readonly listeners = new Map<number, Listener>();
-  private readonly statusCallbacks = new Map<number, Set<(result: SessionStatusResult) => void>>();
+  private readonly listeners = new Map<string, Listener>();
+  private readonly statusCallbacks = new Map<string, Set<(result: SessionStatusResult) => void>>();
   private connection: RealtimeConnection | null = null;
+  private hasEverConnected = false;
 
   constructor(
     private readonly connectionFactory: () => RealtimeConnection,
@@ -40,9 +43,11 @@ export class StreamConnectionManager {
     this.connection.setHandlers({
       onMessage: (payload) => this.handleMessage(payload),
       onError: (error) => this.handleError(error),
-      onClose: (reason) => this.handleClose(reason)
+      onClose: (reason, details) => this.handleClose(reason, details),
+      onReconnect: () => this.handleReconnect()
     });
     await this.connection.connect();
+    this.hasEverConnected = true;
   }
 
   isConnected(): boolean {
@@ -73,7 +78,7 @@ export class StreamConnectionManager {
     this.listeners.delete(listener.welinkSessionId);
   }
 
-  registerStatusCallback(sessionId: number, callback: (result: SessionStatusResult) => void): void {
+  registerStatusCallback(sessionId: string, callback: (result: SessionStatusResult) => void): void {
     validateSessionId(sessionId);
 
     if (typeof callback !== "function") {
@@ -89,7 +94,7 @@ export class StreamConnectionManager {
     this.statusCallbacks.set(sessionId, current);
   }
 
-  emitStatus(sessionId: number, result: SessionStatusResult): void {
+  emitStatus(sessionId: string, result: SessionStatusResult): void {
     for (const callback of this.statusCallbacks.get(sessionId) ?? []) {
       callback(result);
     }
@@ -98,6 +103,13 @@ export class StreamConnectionManager {
   close(): void {
     this.connection?.close();
     this.connection = null;
+  }
+
+  reset(): void {
+    this.close();
+    this.listeners.clear();
+    this.statusCallbacks.clear();
+    this.hasEverConnected = false;
   }
 
   private handleMessage(payload: unknown): void {
@@ -129,17 +141,35 @@ export class StreamConnectionManager {
     }
   }
 
-  private handleClose(reason: string): void {
+  private handleClose(reason: string, details?: { reconnecting: boolean }): void {
     for (const listener of this.listeners.values()) {
       listener.onClose?.(reason);
     }
 
-    this.connection = null;
+    if (!details?.reconnecting) {
+      this.connection = null;
+    }
+  }
+
+  private handleReconnect(): void {
+    this.sendResumeIfSupported();
+  }
+
+  private sendResumeIfSupported(): void {
+    if (!this.hasEverConnected) {
+      return;
+    }
+
+    try {
+      this.connection?.send?.('{"action":"resume"}');
+    } catch {
+      // Ignore unsupported or temporarily unavailable send paths during recovery.
+    }
   }
 }
 
-function validateSessionId(sessionId: number): void {
-  if (!Number.isFinite(sessionId) || sessionId <= 0) {
+function validateSessionId(sessionId: string): void {
+  if (typeof sessionId !== "string" || !sessionId.trim()) {
     throw createSdkError(1000, "无效的参数: welinkSessionId");
   }
 }

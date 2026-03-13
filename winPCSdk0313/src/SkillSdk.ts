@@ -56,7 +56,8 @@ export class SkillSdk implements SkillSdkApi {
   }
 
   async closeSkill(): Promise<CloseSkillResult> {
-    this.connectionManager.close();
+    this.connectionManager.reset();
+    this.cacheStore.clear();
     return { status: "success" };
   }
 
