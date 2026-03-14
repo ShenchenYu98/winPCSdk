@@ -171,14 +171,16 @@ export class MessageCacheStore {
 
   toPageResult(sessionId: string, historyPage: PageResult<SessionMessage>): PageResult<SessionMessage> {
     const merged = this.getMergedMessages(sessionId, historyPage.content);
-    const start = historyPage.number * historyPage.size;
+    const start = historyPage.page * historyPage.size;
     const end = start + historyPage.size;
+    const total = merged.length;
 
     return {
       content: merged.slice(start, end),
-      number: historyPage.number,
+      page: historyPage.page,
       size: historyPage.size,
-      totalElements: merged.length
+      total,
+      totalPages: historyPage.size > 0 ? Math.ceil(total / historyPage.size) : 0
     };
   }
 

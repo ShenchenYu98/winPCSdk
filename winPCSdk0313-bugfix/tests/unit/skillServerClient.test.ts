@@ -38,9 +38,10 @@ describe("SkillServerClient", () => {
             updatedAt: "2026-03-08T00:16:00"
           }
         ],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
 
@@ -48,7 +49,8 @@ describe("SkillServerClient", () => {
 
     expect(result.content).toHaveLength(1);
     expect(result.content[0]?.welinkSessionId).toBe("42");
-    expect(result.totalElements).toBe(1);
+    expect(result.total).toBe(1);
+    expect(result.totalPages).toBe(1);
   });
 
   it("allows session reuse queries without ak", async () => {
@@ -58,9 +60,10 @@ describe("SkillServerClient", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 0
+        total: 0,
+        totalPages: 0
       })
     );
 
@@ -77,9 +80,10 @@ describe("SkillServerClient", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 0
+        total: 0,
+        totalPages: 0
       })
     );
 
@@ -118,9 +122,10 @@ describe("SkillServerClient", () => {
             updatedAt: "2026-03-08T00:17:00"
           }
         ],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 2
+        total: 2,
+        totalPages: 1
       })
     );
 
@@ -141,9 +146,10 @@ describe("SkillServerClient", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 0
+        total: 0,
+        totalPages: 0
       })
     );
     fetchMock.mockResolvedValueOnce(
@@ -246,9 +252,10 @@ describe("SkillServerClient", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [],
-        number: 2,
+        page: 2,
         size: 5,
-        totalElements: 11
+        total: 11,
+        totalPages: 3
       })
     );
 
@@ -256,9 +263,10 @@ describe("SkillServerClient", () => {
 
     expect(result).toEqual({
       content: [],
-      number: 2,
+      page: 2,
       size: 5,
-      totalElements: 11
+      total: 11,
+      totalPages: 3
     });
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/api/skill/sessions/42/messages?page=2&size=5");
   });

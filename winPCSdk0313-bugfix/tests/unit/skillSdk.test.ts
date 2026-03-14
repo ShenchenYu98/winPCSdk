@@ -48,9 +48,10 @@ describe("SkillSdk public api", () => {
           createSessionPayload("2026-03-08T00:15:00"),
           createSessionPayload("2026-03-08T00:16:00")
         ],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 2
+        total: 2,
+        totalPages: 1
       })
     );
 
@@ -74,9 +75,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 0
+        total: 0,
+        totalPages: 0
       })
     );
     fetchMock.mockResolvedValueOnce(createLayer1SuccessResponse(createSessionPayload()));
@@ -102,9 +104,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [createSessionPayload()],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
 
@@ -131,9 +134,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [createSessionPayload()],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
 
@@ -194,9 +198,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [createSessionPayload()],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
 
@@ -274,9 +279,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [createSessionPayload()],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
 
@@ -323,9 +329,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [createSessionPayload()],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
 
@@ -374,9 +381,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [createSessionPayload()],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
 
@@ -473,9 +481,10 @@ describe("SkillSdk public api", () => {
             createdAt: "2026-03-08T00:15:00"
           }
         ],
-        number: 0,
+        page: 0,
         size: 50,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
     fetchMock.mockResolvedValueOnce(
@@ -510,9 +519,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [createSessionPayload()],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
     await sdk.createSession({
@@ -567,9 +577,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [createSessionPayload()],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
     await sdk.createSession({ imGroupId: "group_1" });
@@ -672,9 +683,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [createSessionPayload()],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
     await sdk.createSession({
@@ -723,9 +735,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [createSessionPayload()],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
     await sdk.createSession({
@@ -761,9 +774,10 @@ describe("SkillSdk public api", () => {
             createdAt: "2026-03-08T00:15:00"
           }
         ],
-        number: 0,
+        page: 0,
         size: 10,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
 
@@ -773,8 +787,9 @@ describe("SkillSdk public api", () => {
       size: 10
     });
 
-    expect(result.number).toBe(0);
-    expect(result.totalElements).toBe(2);
+    expect(result.page).toBe(0);
+    expect(result.total).toBe(2);
+    expect(result.totalPages).toBe(1);
     expect(result.content.map((message) => message.id)).toEqual(["m_hist", "m_stream"]);
   });
 
@@ -789,9 +804,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [createSessionPayload()],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
     await sdk.createSession({ imGroupId: "group_1" });
@@ -839,9 +855,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [],
-        number: 0,
+        page: 0,
         size: 10,
-        totalElements: 0
+        total: 0,
+        totalPages: 0
       })
     );
     fetchMock.mockResolvedValueOnce(createLayer1SuccessResponse({ success: true }));
@@ -979,9 +996,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [createSessionPayload()],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
     await sdk.createSession({ imGroupId: "group_1" });
@@ -1065,9 +1083,10 @@ describe("SkillSdk public api", () => {
     fetchMock.mockResolvedValueOnce(
       createLayer1SuccessResponse({
         content: [createSessionPayload()],
-        number: 0,
+        page: 0,
         size: 20,
-        totalElements: 1
+        total: 1,
+        totalPages: 1
       })
     );
     await sdk.createSession({ imGroupId: "group_1" });

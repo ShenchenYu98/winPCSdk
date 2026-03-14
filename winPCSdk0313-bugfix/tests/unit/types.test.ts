@@ -52,8 +52,9 @@ describe("SDK type structures", () => {
   });
 
   it("uses service-aligned page result fields", () => {
-    expectTypeOf<PageResult<SessionMessage>["number"]>().toEqualTypeOf<number>();
-    expectTypeOf<PageResult<SessionMessage>["totalElements"]>().toEqualTypeOf<number>();
+    expectTypeOf<PageResult<SessionMessage>["page"]>().toEqualTypeOf<number>();
+    expectTypeOf<PageResult<SessionMessage>["total"]>().toEqualTypeOf<number>();
+    expectTypeOf<PageResult<SessionMessage>["totalPages"]>().toEqualTypeOf<number>();
   });
 
   it("keeps session listener api result shapes stable", () => {

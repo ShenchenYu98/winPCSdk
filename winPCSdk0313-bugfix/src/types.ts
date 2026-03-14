@@ -91,9 +91,10 @@ export interface SDKError {
 
 export interface PageResult<T> {
   content: T[];
-  number: number;
+  page: number;
   size: number;
-  totalElements: number;
+  total: number;
+  totalPages: number;
 }
 
 export interface SessionMessagePart {

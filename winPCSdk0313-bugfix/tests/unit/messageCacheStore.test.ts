@@ -173,12 +173,14 @@ describe("MessageCacheStore", () => {
 
     const page = store.toPageResult("42", {
       content: [],
-      number: 0,
+      page: 0,
       size: 10,
-      totalElements: 0
+      total: 0,
+      totalPages: 0
     });
 
-    expect(page.totalElements).toBe(2);
+    expect(page.total).toBe(2);
+    expect(page.totalPages).toBe(1);
     expect(page.content[0]?.id).toBe("m_1");
     expect(page.content[1]?.id).toBe("m_2");
     expect(page.content[1]?.content).toBe("streaming cache message");
