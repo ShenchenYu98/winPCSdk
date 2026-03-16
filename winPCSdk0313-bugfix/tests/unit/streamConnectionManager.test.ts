@@ -37,6 +37,29 @@ describe("StreamConnectionManager", () => {
     expect(statuses).toEqual(["executing"]);
   });
 
+  it("keeps only the latest status callback for a session", async () => {
+    const connection = new MockRealtimeConnection();
+    const firstStatuses: string[] = [];
+    const secondStatuses: string[] = [];
+    const manager = new StreamConnectionManager(() => connection, () => undefined);
+
+    await manager.ensureConnected();
+
+    manager.registerStatusCallback("42", (result) => firstStatuses.push(result.status));
+    manager.registerStatusCallback("42", (result) => secondStatuses.push(result.status));
+
+    connection.emitMessage({
+      type: "session.status",
+      seq: 1,
+      welinkSessionId: "42",
+      emittedAt: "2026-03-08T00:16:00.000Z",
+      sessionStatus: "busy"
+    });
+
+    expect(firstStatuses).toEqual([]);
+    expect(secondStatuses).toEqual(["executing"]);
+  });
+
   it("keeps the first listener for a session and surfaces error/close callbacks", async () => {
     const connection = new MockRealtimeConnection();
     const events: string[] = [];

@@ -25,7 +25,7 @@ type Listener = RegisterSessionListenerParams;
 
 export class StreamConnectionManager {
   private readonly listeners = new Map<string, Listener>();
-  private readonly statusCallbacks = new Map<string, Set<(result: SessionStatusResult) => void>>();
+  private readonly statusCallbacks = new Map<string, (result: SessionStatusResult) => void>();
   private connection: RealtimeConnection | null = null;
   private hasEverConnected = false;
 
@@ -89,15 +89,11 @@ export class StreamConnectionManager {
       throw createSdkError(3000, "未建立连接");
     }
 
-    const current = this.statusCallbacks.get(sessionId) ?? new Set<(result: SessionStatusResult) => void>();
-    current.add(callback);
-    this.statusCallbacks.set(sessionId, current);
+    this.statusCallbacks.set(sessionId, callback);
   }
 
   emitStatus(sessionId: string, result: SessionStatusResult): void {
-    for (const callback of this.statusCallbacks.get(sessionId) ?? []) {
-      callback(result);
-    }
+    this.statusCallbacks.get(sessionId)?.(result);
   }
 
   close(): void {
