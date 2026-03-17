@@ -75,8 +75,15 @@ export class SessionOrchestrator {
 
     const page = params.page ?? 0;
     const size = params.size ?? 50;
+    const isFirst = params.isFirst ?? false;
     const history = await this.client.getSessionMessages(params.welinkSessionId, page, size);
-    return this.cacheStore.toPageResult(params.welinkSessionId, history);
+    this.cacheStore.applyHistory(params.welinkSessionId, history.content);
+
+    if (!isFirst) {
+      return history;
+    }
+
+    return this.cacheStore.toFirstFetchPageResult(params.welinkSessionId, history);
   }
 
   async replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult> {

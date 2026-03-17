@@ -105,7 +105,7 @@ createSession(params: CreateSessionParams): Promise<SkillSession>
 1. 建立 WebSocket 连接，若当前用户已有连接则复用，否则新建：
    - **URL**: `ws://host/ws/skill/stream`
    - 用于接收服务端推送的完整事件流
-2. 调用服务端 REST API 查询会话列表，根据入参组合查询活跃会话：
+2. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连；然后查询会话列表：
    - **URL**: `GET /api/skill/sessions`
    - **查询参数**:
      ```json
@@ -280,9 +280,10 @@ stopSkill(params: StopSkillParams): Promise<StopSkillResult>
 
 ### 实现方法
 
-1. 调用服务端 REST API：
+1. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连
+2. 调用服务端 REST API：
    - **URL**: `POST /api/skill/sessions/{welinkSessionId}/abort`
-2. SDK收到成功响应后，触发 `onSessionStatusChange` 的 `stopped` 状态
+3. SDK收到成功响应后，触发 `onSessionStatusChange` 的 `stopped` 状态
 
 ### 错误处理
 
@@ -329,11 +330,11 @@ IM 客户端调用
 - 该接口依赖已建立的 WebSocket 连接
 - 服务端原始状态为 `busy / idle / retry`
 - 客户端 SDK 继续向上层暴露 `executing / stopped / completed` 三态
-- 发送消息后，SDK 仅通过 WebSocket `onmessage` 报文中的 `session.status` 判断会话状态
+- SDK 主要通过 WebSocket `onmessage` 报文中的 `session.status` 判断会话状态，`stopSkill()` 成功是唯一的本地主动状态触发
 - 当 `session.status=busy` 或 `session.status=retry` 时，返回 `executing`
-- 当 `session.status=idle` 时，返回 `completed`
+- 当 `session.status=idle` 且不处于 `stopSkill()` 后的 `stopped` 保持阶段时，返回 `completed`
 - 调用 `stopSkill()` 成功后，触发 `onSessionStatusChange` 的 `stopped` 状态
-- 当重新执行 `sendMessage` 后，若 WebSocket 再次返回 `session.status=busy/retry`，再返回 `executing`
+- 当重新执行 `sendMessage` 或 `regenerateAnswer` 后，若 WebSocket 再次返回 `session.status=busy/retry`，再返回 `executing`
 
 ### 接口名
 
@@ -358,16 +359,17 @@ onSessionStatusChange(params: OnSessionStatusChangeParams): void
 
 | WebSocket 消息 `type` / 触发 | 附加条件 | SDK 状态 | 说明 |
 |-----------------------------|----------|----------|------|
-| `session.status` | `sessionStatus = busy` 或 `retry`（在 `sendMessage` 之后收到） | `executing` | 发送消息后会话处理中或重试中 |
-| `session.status` | `sessionStatus = idle` | `completed` | 会话回到空闲，表示当前轮完成 |
+| `session.status` | `sessionStatus = busy` 或 `retry`（在 `sendMessage`/`regenerateAnswer` 触发新一轮后收到） | `executing` | 会话处理中或重试中 |
+| `session.status` | `sessionStatus = idle` 且当前不在 `stopped` 保持阶段 | `completed` | 会话自然回到空闲，表示当前轮完成 |
+| `session.status` | `sessionStatus = idle` 且当前在 `stopped` 保持阶段 | 不回调（保持 `stopped`） | `stopSkill()` 后服务端返回的中止完成状态，不映射为 `completed` |
 | SDK 本地触发 | 调用 `stopSkill()` 成功 | `stopped` | 触发 `onSessionStatusChange` 的 `stopped` 状态 |
 
 ### 补充说明
 
 - `session.title` 暂不参与状态映射
 - 仅 `session.status` 参与状态映射，其他流式事件（如 `text.delta`、`tool.update`、`step.done` 等）不改变状态
-- `stopSkill()` 成功触发 `stopped` 后，状态不会自动回到 `executing`
-- 只有重新执行 `sendMessage`，且后续收到 `session.status=busy/retry` 时，才再次回到 `executing`
+- `stopSkill()` 成功后，SDK 进入 `stopped` 保持阶段；此阶段内若收到 `session.status=idle`，不触发 `completed`
+- `stopped` 保持阶段仅在重新触发新一轮（`sendMessage` 或 `regenerateAnswer`）并收到后续 `session.status=busy/retry` 后结束
 
 ### 错误处理
 
@@ -519,15 +521,16 @@ regenerateAnswer(params: RegenerateAnswerParams): Promise<SendMessageResult>
 1. 根据 `welinkSessionId` 找到最后一条用户消息
 2. 若 SDK 本地已缓存用户消息，则优先复用本地缓存
 3. 若本地缓存不存在，可先从历史消息中定位最后一条 `role=user` 的消息
-4. 调用服务端 REST API：
+4. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连
+5. 调用服务端 REST API：
    - **URL**: `POST /api/skill/sessions/{welinkSessionId}/messages`
    - **请求体**:
-     ```json
-     {
-       "content": "{最后一条用户消息内容}"
-     }
-     ```
-5. 通过 WebSocket 继续接收本轮新的流式回答
+      ```json
+      {
+        "content": "{最后一条用户消息内容}"
+      }
+      ```
+6. 通过 WebSocket 继续接收本轮新的流式回答
 
 ### 错误处理
 
@@ -624,19 +627,20 @@ sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult>
 3. SDK 调用 Skill 服务端“发送到 IM”接口时，会传入：
    - `content`：从 SDK 缓存中获取的完成的消息内容
    - `chatId`：若入参提供则原样透传；若未提供则不由 SDK 补齐，按服务端接口规则处理
-调用服务端 REST API 发送消息到 IM：
-- **URL**: `POST /api/skill/sessions/{welinkSessionId}/send-to-im`
-- **请求体**:
-  ```json
-  {
-    "content": "代码重构已完成，请查看 PR #42",
-    "chatId": "group_abc123"
-  }
-  ```
-- **响应**:
-  ```json
-  { "success": true }
-  ```
+4. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连
+5. 调用服务端 REST API 发送消息到 IM：
+   - **URL**: `POST /api/skill/sessions/{welinkSessionId}/send-to-im`
+   - **请求体**:
+     ```json
+     {
+       "content": "代码重构已完成，请查看 PR #42",
+       "chatId": "group_abc123"
+     }
+     ```
+   - **响应**:
+     ```json
+     { "success": true }
+     ```
 
 ### 缓存管理
 
@@ -746,6 +750,8 @@ we码调用
 - AI 已持续返回回答内容，但还没回答结束
 - 此时调用 `getSessionMessage` 接口需要获取当前会话所有历史消息和当前已连接会话所持续返回的消息内容
 
+补充说明：新增 `isFirst` 入参用于区分首次获取与后续分页获取。
+
 ### 接口名
 
 ```typescript
@@ -759,22 +765,23 @@ getSessionMessage(params: GetSessionMessageParams): Promise<PageResult<SessionMe
 | welinkSessionId | string | 是 | - | 会话 ID |
 | page | number | 否 | 0 | 页码（从 0 开始） |
 | size | number | 否 | 50 | 每页条数 |
+| isFirst | boolean | 否 | false | 是否首次获取。`true` 时合并本地流式缓存并将该消息插入返回 `content` 首位；`false` 时直接返回服务端内容（保持服务端时间降序） |
 
 ### 出参
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| content | Array<SessionMessage> | 历史消息列表 |
-| page | number | 当前页码（从 0 开始） |
-| size | number | 每页条数 |
-| total | number | 总消息数 |
-| totalPages | number | 总页数 |
+| content | Array<SessionMessage> | 历史消息列表（按时间降序：从最新到最旧） |
+| page | number | 当前页码（从 0 开始，透传服务端返回） |
+| size | number | 每页大小（透传服务端返回） |
+| total | number | 总记录数（透传服务端返回） |
+| totalPages | number | 总页数（透传服务端返回） |
 
 ### 实现方法
 
 #### 1. 获取历史消息
 
-调用服务端 REST API：
+调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连，然后再请求历史消息：
 
 - **URL**: `GET /api/skill/sessions/{welinkSessionId}/messages`
 
@@ -808,14 +815,15 @@ SDK 内部维护流式消息缓存，用于存储尚未落库但已经通过 Web
 
 调用 `getSessionMessage` 时，SDK 执行以下步骤：
 
-1. 获取服务端历史消息
-2. 获取本地流式缓存中的所有消息，包括：
+1. 获取服务端历史消息（服务端 `content` 已按时间降序返回，即从最新到最旧）
+2. 若 `isFirst=false`，直接返回服务端获取的内容，并保持服务端原始顺序（不做二次重排）
+3. 若 `isFirst=true`，获取本地流式缓存中的所有消息，包括：
    - 已完成的消息（`text.done` / `thinking.done` 标记的）
    - 进行中的消息（仅通过 `text.delta` 等增量事件接收的）
-3. 对同一稳定消息 ID（`messageId` 或 `snapshot.messages[].id`）做去重和合并，确保消息的完整性和一致性
-4. 按 `seq`（有值优先）再按 `messageSeq` 排序，确保消息顺序正确
-5. 若当前存在未持久化的进行中消息，将其追加到返回列表
-6. 处理分页逻辑，确保返回指定页的消息
+4. 对同一稳定消息 ID（`messageId` 或 `snapshot.messages[].id`）做去重和合并，确保消息的完整性和一致性
+5. 将本地流式缓存聚合出的消息插入最终返回 `content` 的第一个位置
+6. 除首位插入的本地聚合消息外，其余消息保持服务端时间降序（从最新到最旧）
+7. 返回最终结果；其中 `page` / `size` / `total` / `totalPages` 透传服务端返回值，不因本地首位插入消息变化
 
 ### 缓存实现细节
 
@@ -845,7 +853,7 @@ interface MessageCache {
         createdAt: string;
       };
     };
-    messageSeqOrder: string[]; // 按 seq/messageSeq 排序的稳定消息 ID 列表
+    messageSeqOrder: string[]; // 用于缓存合并的稳定消息 ID 列表（不作为对外返回顺序依据）
   };
 }
 ```
@@ -857,12 +865,14 @@ interface MessageCache {
 2. 根据消息类型更新本地缓存
 3. 对于增量消息（如 `text.delta`），实时更新缓存中的内容
 4. 对于完成消息（如 `text.done`），标记消息为已完成并更新最终内容
-5. 当调用 `getSessionMessage` 时，SDK 会将这些实时消息与历史消息合并后返回
+5. 当调用 `getSessionMessage` 且 `isFirst=true` 时，SDK 会将这些实时消息与历史消息合并后返回
 
 #### 数据一致性保证
 
 - **去重机制**：通过稳定消息 ID（`messageId` 或 `snapshot.messages[].id`）确保消息不重复
-- **顺序保证**：通过 `seq`（优先）+ `messageSeq` 确保消息顺序正确
+- **首次控制**：`isFirst=true` 时合并本地流式缓存并插入首位，`isFirst=false` 时直接返回服务端结果
+- **顺序保证**：返回 `content` 统一按时间降序（从最新到最旧）；`isFirst=true` 时本地聚合消息固定插入 `content[0]`
+- **分页元信息透传**：`page` / `size` / `total` / `totalPages` 透传服务端返回，不受本地首位插入消息影响
 - **完整性保证**：对于进行中的消息，返回当前已接收的所有内容
 - **实时性保证**：缓存实时更新，确保获取到最新的消息状态
 
@@ -896,11 +906,12 @@ try {
   const result = await getSessionMessage({
     welinkSessionId: "42",
     page: 0,
-    size: 50
+    size: 50,
+    isFirst: true
   });
 
-  console.log("总消息数:", result.totalElements);
-  console.log("当前页:", result.number);
+  console.log("总消息数:", result.total);
+  console.log("当前页:", result.page);
 
   result.content.forEach((message) => {
     console.log(`[${message.role}] ${message.content}`);
@@ -1166,7 +1177,7 @@ sendMessage(params: SendMessageParams): Promise<SendMessageResult>
 
 ### 实现方法
 
-1. 检查 WebSocket 连接状态，若未建立则自动建立：
+1. 检查 WebSocket 连接状态，若未连接则自动重连：
    - **URL**: `ws://host/ws/skill/stream`
    - 用于接收服务端推送的完整事件流
 2. 调用服务端 REST API 发送消息：
@@ -1274,15 +1285,15 @@ replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult>
 
 ### 实现方法
 
-调用服务端 REST API：
-
-- **URL**: `POST /api/skill/sessions/{welinkSessionId}/permissions/{permId}`
-- **请求体**:
-  ```json
-  {
-    "response": "once"
-  }
-  ```
+1. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连
+2. 调用服务端 REST API：
+   - **URL**: `POST /api/skill/sessions/{welinkSessionId}/permissions/{permId}`
+   - **请求体**:
+     ```json
+     {
+       "response": "once"
+     }
+     ```
 
 ### 错误处理
 
@@ -1452,6 +1463,7 @@ try {
 | welinkSessionId | string | 是 | - | 会话 ID |
 | page | number | 否 | 0 | 页码（从 0 开始） |
 | size | number | 否 | 50 | 每页条数 |
+| isFirst | boolean | 否 | false | 是否首次获取。`true` 时合并本地流式缓存并将该消息插入返回 `content` 首位；`false` 时直接返回服务端内容（保持服务端时间降序） |
 
 ### RegisterSessionListenerParams
 
@@ -1532,7 +1544,7 @@ try {
 | content | Array<T> | 当前页数据 |
 | page | number | 当前页码（从 0 开始） |
 | size | number | 每页大小 |
-| total | number | 总消息数 |
+| total | number | 总记录数 |
 | totalPages | number | 总页数 |
 
 ### SessionMessage

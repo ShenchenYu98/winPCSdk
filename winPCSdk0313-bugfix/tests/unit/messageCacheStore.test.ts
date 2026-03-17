@@ -186,6 +186,82 @@ describe("MessageCacheStore", () => {
     expect(page.content[1]?.content).toBe("streaming cache message");
   });
 
+  it("prepends the latest local aggregated message while preserving service order and metadata", () => {
+    const store = new MessageCacheStore();
+
+    store.applyStream({
+      type: "text.done",
+      seq: 3,
+      welinkSessionId: "42",
+      emittedAt: "2026-03-08T00:16:03.000Z",
+      messageId: "m_stream",
+      messageSeq: 3,
+      role: "assistant",
+      partId: "p_stream",
+      partSeq: 1,
+      content: "streaming cache message"
+    });
+
+    store.applyHistory("42", [
+      createHistoryMessage("m_hist_1", 1, "history 1"),
+      createHistoryMessage("m_hist_2", 2, "history 2")
+    ]);
+
+    const page = store.toFirstFetchPageResult("42", {
+      content: [
+        createHistoryMessage("m_hist_1", 1, "history 1"),
+        createHistoryMessage("m_hist_2", 2, "history 2")
+      ],
+      page: 0,
+      size: 10,
+      total: 2,
+      totalPages: 1
+    });
+
+    expect(page.page).toBe(0);
+    expect(page.size).toBe(10);
+    expect(page.total).toBe(2);
+    expect(page.totalPages).toBe(1);
+    expect(page.content.map((message) => message.id)).toEqual([
+      "m_stream",
+      "m_hist_1",
+      "m_hist_2"
+    ]);
+  });
+
+  it("deduplicates the local aggregated message from the service page when ids match", () => {
+    const store = new MessageCacheStore();
+
+    store.applyStream({
+      type: "text.done",
+      seq: 3,
+      welinkSessionId: "42",
+      emittedAt: "2026-03-08T00:16:03.000Z",
+      messageId: "m_dup",
+      messageSeq: 3,
+      role: "assistant",
+      partId: "p_dup",
+      partSeq: 1,
+      content: "local latest"
+    });
+
+    const page = store.toFirstFetchPageResult("42", {
+      content: [
+        createHistoryMessage("m_dup", 3, "history duplicate"),
+        createHistoryMessage("m_hist", 1, "history 1")
+      ],
+      page: 0,
+      size: 10,
+      total: 2,
+      totalPages: 1
+    });
+
+    expect(page.content.map((message) => message.id)).toEqual(["m_dup", "m_hist"]);
+    expect(page.content[0]?.content).toBe("local latest");
+    expect(page.total).toBe(2);
+    expect(page.totalPages).toBe(1);
+  });
+
   it("stores final text using stable string message ids", () => {
     const store = new MessageCacheStore();
 

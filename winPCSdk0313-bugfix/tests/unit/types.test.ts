@@ -34,6 +34,7 @@ describe("SDK type structures", () => {
     expectTypeOf<CreateSessionParams["ak"]>().toEqualTypeOf<string | undefined>();
     expectTypeOf<CreateSessionParams["imGroupId"]>().toEqualTypeOf<string>();
     expectTypeOf<GetSessionMessageParams["page"]>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<GetSessionMessageParams["isFirst"]>().toEqualTypeOf<boolean | undefined>();
     expectTypeOf<StopSkillParams["welinkSessionId"]>().toEqualTypeOf<string>();
     expectTypeOf<ReplyPermissionParams["permId"]>().toEqualTypeOf<string>();
   });

@@ -724,7 +724,7 @@ describe("SkillSdk public api", () => {
     });
   });
 
-  it("gets merged session messages with V5 page result fields", async () => {
+  it("returns the service page untouched when getSessionMessage is not first fetch", async () => {
     const connection = new MockRealtimeConnection();
     const sdk = new SkillSdk({
       baseUrl: "http://skill.test",
@@ -788,9 +788,96 @@ describe("SkillSdk public api", () => {
     });
 
     expect(result.page).toBe(0);
+    expect(result.total).toBe(1);
+    expect(result.totalPages).toBe(1);
+    expect(result.content.map((message) => message.id)).toEqual(["m_hist"]);
+  });
+
+  it("inserts the latest local aggregated message at content[0] on first fetch", async () => {
+    const connection = new MockRealtimeConnection();
+    const sdk = new SkillSdk({
+      baseUrl: "http://skill.test",
+      connectionFactory: () => connection
+    });
+    const fetchMock = vi.mocked(globalThis.fetch);
+
+    fetchMock.mockResolvedValueOnce(
+      createLayer1SuccessResponse({
+        content: [createSessionPayload()],
+        page: 0,
+        size: 20,
+        total: 1,
+        totalPages: 1
+      })
+    );
+    await sdk.createSession({
+      imGroupId: "group_1"
+    });
+
+    connection.emitMessage({
+      type: "text.done",
+      seq: 3,
+      welinkSessionId: "42",
+      emittedAt: "2026-03-08T00:16:03.000Z",
+      messageId: "m_stream",
+      messageSeq: 3,
+      role: "assistant",
+      partId: "p_3",
+      partSeq: 1,
+      content: "流式缓存"
+    });
+
+    fetchMock.mockResolvedValueOnce(
+      createLayer1SuccessResponse({
+        content: [
+          {
+            id: "m_hist_1",
+            seq: 1,
+            welinkSessionId: "42",
+            role: "assistant",
+            content: "历史消息1",
+            contentType: "plain",
+            meta: { tokens: 1 },
+            messageSeq: 1,
+            parts: [],
+            createdAt: "2026-03-08T00:15:00"
+          },
+          {
+            id: "m_hist_2",
+            seq: 2,
+            welinkSessionId: "42",
+            role: "assistant",
+            content: "历史消息2",
+            contentType: "plain",
+            meta: { tokens: 2 },
+            messageSeq: 2,
+            parts: [],
+            createdAt: "2026-03-08T00:14:00"
+          }
+        ],
+        page: 0,
+        size: 10,
+        total: 2,
+        totalPages: 1
+      })
+    );
+
+    const result = await sdk.getSessionMessage({
+      welinkSessionId: "42",
+      page: 0,
+      size: 10,
+      isFirst: true
+    });
+
+    expect(result.page).toBe(0);
+    expect(result.size).toBe(10);
     expect(result.total).toBe(2);
     expect(result.totalPages).toBe(1);
-    expect(result.content.map((message) => message.id)).toEqual(["m_hist", "m_stream"]);
+    expect(result.content.map((message) => message.id)).toEqual([
+      "m_stream",
+      "m_hist_1",
+      "m_hist_2"
+    ]);
   });
 
   it("restores completed and streaming messages after resume events", async () => {
@@ -866,13 +953,14 @@ describe("SkillSdk public api", () => {
     const messages = await sdk.getSessionMessage({
       welinkSessionId: "42",
       page: 0,
-      size: 10
+      size: 10,
+      isFirst: true
     });
     const sendResult = await sdk.sendMessageToIM({
       welinkSessionId: "42"
     });
 
-    expect(messages.content.map((message) => message.id)).toEqual(["m_done", "m_live"]);
+    expect(messages.content.map((message) => message.id)).toEqual(["m_live"]);
     expect(sendResult).toEqual({ success: true });
     expect(JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body))).toEqual({
       content: "done text"

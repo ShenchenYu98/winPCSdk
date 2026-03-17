@@ -21,6 +21,7 @@ interface CachedMessage {
 
 export class MessageCacheStore {
   private readonly sessions = new Map<string, Map<string, CachedMessage>>();
+  private readonly localSessions = new Map<string, Map<string, CachedMessage>>();
   private readonly finalTexts = new Map<string, Map<string, string>>();
   private readonly orderedMessageIds = new Map<string, string[]>();
 
@@ -52,6 +53,7 @@ export class MessageCacheStore {
       this.applyStreamingMessage(cached, message);
       cached.content = buildContent(cached.parts ?? new Map<string, SessionMessagePart>());
       sessionStore.set(messageId, cached);
+      this.saveLocalMessage(message.welinkSessionId, cached);
       this.trackOrder(message.welinkSessionId);
       return;
     }
@@ -106,6 +108,7 @@ export class MessageCacheStore {
     cached.parts = parts;
     cached.content = buildContent(parts);
     sessionStore.set(messageId, cached);
+    this.saveLocalMessage(message.welinkSessionId, cached);
     this.trackOrder(message.welinkSessionId);
 
     if (shouldPersistFinalText(message.type, message.status)) {
@@ -184,8 +187,43 @@ export class MessageCacheStore {
     };
   }
 
+  toFirstFetchPageResult(
+    sessionId: string,
+    historyPage: PageResult<SessionMessage>
+  ): PageResult<SessionMessage> {
+    const localMessage = this.getLatestAggregatedMessage(sessionId);
+
+    if (!localMessage) {
+      return historyPage;
+    }
+
+    const contentWithoutDuplicate = historyPage.content.filter(
+      (message) => message.id !== localMessage.id
+    );
+
+    return {
+      content: [localMessage, ...contentWithoutDuplicate],
+      page: historyPage.page,
+      size: historyPage.size,
+      total: historyPage.total,
+      totalPages: historyPage.totalPages
+    };
+  }
+
+  getLatestAggregatedMessage(sessionId: string): SessionMessage | undefined {
+    const localSessionStore = this.localSessions.get(sessionId);
+
+    if (!localSessionStore || localSessionStore.size === 0) {
+      return undefined;
+    }
+
+    const latest = [...localSessionStore.values()].sort(compareCachedMessagesByLatest)[0];
+    return latest ? toSessionMessage(latest) : undefined;
+  }
+
   clear(): void {
     this.sessions.clear();
+    this.localSessions.clear();
     this.finalTexts.clear();
     this.orderedMessageIds.clear();
   }
@@ -255,6 +293,21 @@ export class MessageCacheStore {
     return sessionStore;
   }
 
+  private getLocalSessionStore(sessionId: string): Map<string, CachedMessage> {
+    let sessionStore = this.localSessions.get(sessionId);
+
+    if (!sessionStore) {
+      sessionStore = new Map<string, CachedMessage>();
+      this.localSessions.set(sessionId, sessionStore);
+    }
+
+    return sessionStore;
+  }
+
+  private saveLocalMessage(sessionId: string, message: CachedMessage): void {
+    this.getLocalSessionStore(sessionId).set(message.id, cloneCachedMessage(message));
+  }
+
   private saveFinalText(sessionId: string, messageId: string, content: string): void {
     let sessionTexts = this.finalTexts.get(sessionId);
 
@@ -292,6 +345,27 @@ function compareCachedEntries(
 
 function compareCachedMessagesDescending(left: CachedMessage, right: CachedMessage): number {
   return compareBySequence(right, left);
+}
+
+function compareCachedMessagesByLatest(left: CachedMessage, right: CachedMessage): number {
+  const leftTime = Date.parse(left.createdAt);
+  const rightTime = Date.parse(right.createdAt);
+
+  if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime) && leftTime !== rightTime) {
+    return rightTime - leftTime;
+  }
+
+  const leftSeq = left.seq ?? Number.MIN_SAFE_INTEGER;
+  const rightSeq = right.seq ?? Number.MIN_SAFE_INTEGER;
+
+  if (leftSeq !== rightSeq) {
+    return rightSeq - leftSeq;
+  }
+
+  const leftMessageSeq = left.messageSeq ?? Number.MIN_SAFE_INTEGER;
+  const rightMessageSeq = right.messageSeq ?? Number.MIN_SAFE_INTEGER;
+
+  return rightMessageSeq - leftMessageSeq;
 }
 
 function compareBySequence(left: CachedMessage, right: CachedMessage): number {
@@ -381,6 +455,26 @@ function shouldPersistFinalText(type: string, status?: string | null): boolean {
   }
 
   return false;
+}
+
+function cloneCachedMessage(message: CachedMessage): CachedMessage {
+  return {
+    ...message,
+    parts: message.parts
+      ? new Map(
+          [...message.parts.entries()].map(([partId, part]) => [
+            partId,
+            {
+              ...part,
+              options: part.options ? [...part.options] : part.options,
+              input: part.input ? { ...part.input } : part.input,
+              metadata: part.metadata ? { ...part.metadata } : part.metadata
+            }
+          ])
+        )
+      : undefined,
+    meta: message.meta ? { ...message.meta } : message.meta
+  };
 }
 
 function toSessionMessage(message: CachedMessage): SessionMessage {

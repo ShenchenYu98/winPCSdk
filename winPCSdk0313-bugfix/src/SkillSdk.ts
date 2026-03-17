@@ -62,6 +62,7 @@ export class SkillSdk implements SkillSdkApi {
   }
 
   async stopSkill(params: StopSkillParams): Promise<StopSkillResult> {
+    await this.connectionManager.ensureConnected();
     const result = await this.client.abortSession(params.welinkSessionId);
     this.connectionManager.emitStatus(params.welinkSessionId, { status: "stopped" });
     return result;
@@ -76,16 +77,19 @@ export class SkillSdk implements SkillSdkApi {
   }
 
   async regenerateAnswer(params: RegenerateAnswerParams): Promise<SendMessageResult> {
+    await this.connectionManager.ensureConnected();
     return this.orchestrator.regenerateAnswer(params);
   }
 
   async sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult> {
+    await this.connectionManager.ensureConnected();
     return this.orchestrator.sendMessageToIM(params);
   }
 
   async getSessionMessage(
     params: GetSessionMessageParams
   ): Promise<PageResult<SessionMessage>> {
+    await this.connectionManager.ensureConnected();
     return this.orchestrator.getSessionMessage(params);
   }
 
@@ -107,6 +111,7 @@ export class SkillSdk implements SkillSdkApi {
   }
 
   async replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult> {
+    await this.connectionManager.ensureConnected();
     return this.orchestrator.replyPermission(params);
   }
 
