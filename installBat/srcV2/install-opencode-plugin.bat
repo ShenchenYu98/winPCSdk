@@ -1,5 +1,6 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
+chcp 65001 >nul
 
 set "SCRIPT_DIR=%~dp0"
 if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
@@ -196,53 +197,63 @@ function ConvertTo-NativeObject {
   return $InputObject
 }
 
-function Add-EncodingCandidate {
+function Get-Utf8Encoding {
+  return New-Object System.Text.UTF8Encoding($false, $true)
+}
+
+function Read-Utf8Text {
   param(
-    [System.Collections.Generic.List[System.Text.Encoding]]$Encodings,
-    [System.Collections.Generic.HashSet[string]]$Seen,
-    [System.Text.Encoding]$Encoding
+    [string]$Path,
+    [int]$FailureCode
   )
 
-  if ($null -eq $Encoding) {
-    return
+  try {
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $encoding = Get-Utf8Encoding
+    $text = $encoding.GetString($bytes)
+    if ($text.Length -gt 0 -and [int][char]$text[0] -eq 0xFEFF) {
+      $text = $text.Substring(1)
+    }
+    return $text
   }
-
-  if ($Seen.Add($Encoding.WebName)) {
-    [void]$Encodings.Add($Encoding)
+  catch {
+    Fail -Code $FailureCode -Message ''
   }
 }
 
-function Get-JsonEncodings {
+function Write-Utf8Text {
   param(
-    [byte[]]$Bytes
+    [string]$Path,
+    [string]$Text,
+    [int]$FailureCode
   )
 
-  $encodings = New-Object System.Collections.Generic.List[System.Text.Encoding]
-  $seen = New-Object System.Collections.Generic.HashSet[string]
-
-  if ($Bytes.Length -ge 3 -and $Bytes[0] -eq 0xEF -and $Bytes[1] -eq 0xBB -and $Bytes[2] -eq 0xBF) {
-    Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::UTF8)
+  try {
+    $bytes = (Get-Utf8Encoding).GetBytes($Text)
+    [System.IO.File]::WriteAllBytes($Path, $bytes)
   }
-
-  if ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xFF -and $Bytes[1] -eq 0xFE) {
-    Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::Unicode)
+  catch {
+    Fail -Code $FailureCode -Message ''
   }
+}
 
-  if ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xFE -and $Bytes[1] -eq 0xFF) {
-    Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::BigEndianUnicode)
+function Write-Utf8Lines {
+  param(
+    [string]$Path,
+    [string[]]$Lines,
+    [int]$FailureCode
+  )
+
+  try {
+    $text = [string]::Join([Environment]::NewLine, $Lines)
+    if ($Lines.Length -gt 0) {
+      $text += [Environment]::NewLine
+    }
+    Write-Utf8Text -Path $Path -Text $text -FailureCode $FailureCode
   }
-
-  if ($Bytes.Length -ge 4 -and $Bytes[0] -eq 0xFF -and $Bytes[1] -eq 0xFE -and $Bytes[2] -eq 0x00 -and $Bytes[3] -eq 0x00) {
-    Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::UTF32)
+  catch {
+    Fail -Code $FailureCode -Message ''
   }
-
-  Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::UTF8)
-  Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::Default)
-  Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::Unicode)
-  Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::BigEndianUnicode)
-  Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::UTF32)
-
-  return $encodings
 }
 
 function Read-JsonFile {
@@ -253,28 +264,15 @@ function Read-JsonFile {
   )
 
   try {
-    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $text = Read-Utf8Text -Path $Path -FailureCode $InvalidCode
+    if ($AllowJsonc) {
+      $text = ConvertFrom-JsoncText -Text $text
+    }
+    return ($text | ConvertFrom-Json -ErrorAction Stop)
   }
   catch {
     Fail -Code $InvalidCode -Message ''
   }
-
-  foreach ($encoding in (Get-JsonEncodings -Bytes $bytes)) {
-    try {
-      $text = $encoding.GetString($bytes)
-      if ($text.Length -gt 0 -and [int][char]$text[0] -eq 0xFEFF) {
-        $text = $text.Substring(1)
-      }
-      if ($AllowJsonc) {
-        $text = ConvertFrom-JsoncText -Text $text
-      }
-      return ($text | ConvertFrom-Json -ErrorAction Stop)
-    }
-    catch {
-    }
-  }
-
-  Fail -Code $InvalidCode -Message ''
 }
 
 function ConvertFrom-JsoncText {
@@ -442,13 +440,8 @@ function Write-JsonObject {
     [int]$FailureCode
   )
 
-  try {
-    $json = $Data | ConvertTo-Json -Depth 32
-    Set-Content -LiteralPath $Path -Value $json -Encoding UTF8
-  }
-  catch {
-    Fail -Code $FailureCode -Message ''
-  }
+  $json = $Data | ConvertTo-Json -Depth 32
+  Write-Utf8Text -Path $Path -Text $json -FailureCode $FailureCode
 }
 
 function Build-PreviewText {
@@ -473,12 +466,7 @@ function Build-PreviewText {
     ('sk=' + $SkValue)
   )
 
-  try {
-    Set-Content -LiteralPath $previewPath -Value $lines -Encoding Default
-  }
-  catch {
-    Fail -Code 35 -Message ''
-  }
+  Write-Utf8Lines -Path $previewPath -Lines $lines -FailureCode 35
 }
 
 function Update-NpmrcFile {
@@ -491,7 +479,7 @@ function Update-NpmrcFile {
   try {
     $existingLines = @()
     if (Test-Path -LiteralPath $npmrcPath) {
-      $existingLines = @(Get-Content -LiteralPath $npmrcPath)
+      $existingLines = @([System.IO.File]::ReadAllLines($npmrcPath, (Get-Utf8Encoding)))
     }
 
     $resultLines = New-Object System.Collections.Generic.List[string]
@@ -514,7 +502,7 @@ function Update-NpmrcFile {
       [void]$resultLines.Add(($key + '=' + $desired[$key]))
     }
 
-    Set-Content -LiteralPath $npmrcPath -Value $resultLines.ToArray() -Encoding UTF8
+    Write-Utf8Lines -Path $npmrcPath -Lines $resultLines.ToArray() -FailureCode 33
   }
   catch {
     Fail -Code 33 -Message ''
