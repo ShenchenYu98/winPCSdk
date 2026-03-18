@@ -196,6 +196,83 @@ function ConvertTo-NativeObject {
   return $InputObject
 }
 
+function Add-EncodingCandidate {
+  param(
+    [System.Collections.Generic.List[System.Text.Encoding]]$Encodings,
+    [System.Collections.Generic.HashSet[string]]$Seen,
+    [System.Text.Encoding]$Encoding
+  )
+
+  if ($null -eq $Encoding) {
+    return
+  }
+
+  if ($Seen.Add($Encoding.WebName)) {
+    [void]$Encodings.Add($Encoding)
+  }
+}
+
+function Get-JsonEncodings {
+  param(
+    [byte[]]$Bytes
+  )
+
+  $encodings = New-Object System.Collections.Generic.List[System.Text.Encoding]
+  $seen = New-Object System.Collections.Generic.HashSet[string]
+
+  if ($Bytes.Length -ge 3 -and $Bytes[0] -eq 0xEF -and $Bytes[1] -eq 0xBB -and $Bytes[2] -eq 0xBF) {
+    Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::UTF8)
+  }
+
+  if ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xFF -and $Bytes[1] -eq 0xFE) {
+    Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::Unicode)
+  }
+
+  if ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xFE -and $Bytes[1] -eq 0xFF) {
+    Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::BigEndianUnicode)
+  }
+
+  if ($Bytes.Length -ge 4 -and $Bytes[0] -eq 0xFF -and $Bytes[1] -eq 0xFE -and $Bytes[2] -eq 0x00 -and $Bytes[3] -eq 0x00) {
+    Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::UTF32)
+  }
+
+  Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::UTF8)
+  Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::Default)
+  Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::Unicode)
+  Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::BigEndianUnicode)
+  Add-EncodingCandidate -Encodings $encodings -Seen $seen -Encoding ([System.Text.Encoding]::UTF32)
+
+  return $encodings
+}
+
+function Read-JsonFile {
+  param(
+    [string]$Path,
+    [int]$InvalidCode
+  )
+
+  try {
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+  }
+  catch {
+    Fail -Code $InvalidCode -Message ''
+  }
+
+  foreach ($encoding in (Get-JsonEncodings -Bytes $bytes)) {
+    try {
+      $text = $encoding.GetString($bytes)
+      if ($text.Length -gt 0 -and [int][char]$text[0] -eq 0xFEFF) {
+        $text = $text.Substring(1)
+      }
+      return ($text | ConvertFrom-Json -ErrorAction Stop)
+    }
+    catch {
+    }
+  }
+
+  Fail -Code $InvalidCode -Message ''
+}
+
 function Load-JsonObject {
   param(
     [string]$Path,
@@ -212,13 +289,7 @@ function Load-JsonObject {
     Fail -Code $MissingCode -Message ''
   }
 
-  try {
-    $parsed = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json -ErrorAction Stop
-  }
-  catch {
-    Fail -Code $InvalidCode -Message ''
-  }
-
+  $parsed = Read-JsonFile -Path $Path -InvalidCode $InvalidCode
   $native = ConvertTo-NativeObject $parsed
   if ($native -isnot [System.Collections.IDictionary]) {
     Fail -Code $RootCode -Message ''
@@ -329,7 +400,7 @@ function Build-PreviewText {
   )
 
   try {
-    Set-Content -LiteralPath $previewPath -Value $lines -Encoding ASCII
+    Set-Content -LiteralPath $previewPath -Value $lines -Encoding Default
   }
   catch {
     Fail -Code 35 -Message ''
