@@ -7,7 +7,7 @@ if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 set "SOURCE_WECODE=%SCRIPT_DIR%\@wecode"
 set "OPENCODE_DIR=%USERPROFILE%\.config\opencode"
 set "OPENCODE_JSON=%OPENCODE_DIR%\opencode.json"
-set "MESSAGE_BRIDGE_JSON=%OPENCODE_DIR%\message-bridge.json"
+set "MESSAGE_BRIDGE_JSONC=%OPENCODE_DIR%\message-bridge.jsonc"
 set "NODE_MODULES_DIR=%USERPROFILE%\.cache\opencode\node_modules"
 set "TARGET_WECODE=%NODE_MODULES_DIR%\@wecode"
 set "NPMRC_FILE=%USERPROFILE%\.npmrc"
@@ -84,7 +84,7 @@ echo Updated paths:
 echo - %TARGET_WECODE%
 echo - %OPENCODE_JSON%
 echo - %NPMRC_FILE%
-echo - %MESSAGE_BRIDGE_JSON%
+echo - %MESSAGE_BRIDGE_JSONC%
 
 call :cleanup
 call :maybe_pause
@@ -95,12 +95,12 @@ set "INSTALL_EXIT=%~1"
 if "%INSTALL_EXIT%"=="11" echo [FAILED] opencode.json was not found: %OPENCODE_JSON%
 if "%INSTALL_EXIT%"=="12" echo [FAILED] opencode.json is not valid JSON.
 if "%INSTALL_EXIT%"=="13" echo [FAILED] opencode.json root must be a JSON object.
-if "%INSTALL_EXIT%"=="21" echo [FAILED] message-bridge.json is not valid JSON.
-if "%INSTALL_EXIT%"=="22" echo [FAILED] message-bridge.json root must be a JSON object.
+if "%INSTALL_EXIT%"=="21" echo [FAILED] message-bridge.jsonc is not valid JSONC.
+if "%INSTALL_EXIT%"=="22" echo [FAILED] message-bridge.jsonc root must be a JSON object.
 if "%INSTALL_EXIT%"=="31" echo [FAILED] Could not create or replace the @wecode folder in node_modules.
 if "%INSTALL_EXIT%"=="32" echo [FAILED] Could not update opencode.json.
 if "%INSTALL_EXIT%"=="33" echo [FAILED] Could not update .npmrc.
-if "%INSTALL_EXIT%"=="34" echo [FAILED] Could not update message-bridge.json.
+if "%INSTALL_EXIT%"=="34" echo [FAILED] Could not update message-bridge.jsonc.
 if "%INSTALL_EXIT%"=="35" echo [FAILED] Could not write the preview details.
 if "%INSTALL_EXIT%"=="90" echo [FAILED] The installer hit an unexpected error.
 exit /b 0
@@ -141,7 +141,7 @@ $sourceWecode = $env:SOURCE_WECODE
 $targetWecode = $env:TARGET_WECODE
 $nodeModulesDir = $env:NODE_MODULES_DIR
 $opencodeJsonPath = $env:OPENCODE_JSON
-$messageBridgePath = $env:MESSAGE_BRIDGE_JSON
+$messageBridgePath = $env:MESSAGE_BRIDGE_JSONC
 $npmrcPath = $env:NPMRC_FILE
 $previewPath = $env:PREVIEW_FILE
 $ak = $env:INSTALL_AK
@@ -248,7 +248,8 @@ function Get-JsonEncodings {
 function Read-JsonFile {
   param(
     [string]$Path,
-    [int]$InvalidCode
+    [int]$InvalidCode,
+    [switch]$AllowJsonc
   )
 
   try {
@@ -264,6 +265,9 @@ function Read-JsonFile {
       if ($text.Length -gt 0 -and [int][char]$text[0] -eq 0xFEFF) {
         $text = $text.Substring(1)
       }
+      if ($AllowJsonc) {
+        $text = ConvertFrom-JsoncText -Text $text
+      }
       return ($text | ConvertFrom-Json -ErrorAction Stop)
     }
     catch {
@@ -273,13 +277,83 @@ function Read-JsonFile {
   Fail -Code $InvalidCode -Message ''
 }
 
+function ConvertFrom-JsoncText {
+  param(
+    [string]$Text
+  )
+
+  $builder = New-Object System.Text.StringBuilder
+  $inString = $false
+  $escaped = $false
+  $inLineComment = $false
+  $inBlockComment = $false
+
+  for ($index = 0; $index -lt $Text.Length; $index++) {
+    $char = $Text[$index]
+    $next = [char]0
+    if ($index + 1 -lt $Text.Length) {
+      $next = $Text[$index + 1]
+    }
+
+    if ($inLineComment) {
+      if ($char -eq "`r" -or $char -eq "`n") {
+        $inLineComment = $false
+        [void]$builder.Append($char)
+      }
+      continue
+    }
+
+    if ($inBlockComment) {
+      if ($char -eq '*' -and $next -eq '/') {
+        $inBlockComment = $false
+        $index++
+      }
+      continue
+    }
+
+    if ($inString) {
+      [void]$builder.Append($char)
+      if ($escaped) {
+        $escaped = $false
+      } elseif ($char -eq '\') {
+        $escaped = $true
+      } elseif ($char -eq '"') {
+        $inString = $false
+      }
+      continue
+    }
+
+    if ($char -eq '/' -and $next -eq '/') {
+      $inLineComment = $true
+      $index++
+      continue
+    }
+
+    if ($char -eq '/' -and $next -eq '*') {
+      $inBlockComment = $true
+      $index++
+      continue
+    }
+
+    if ($char -eq '"') {
+      $inString = $true
+    }
+
+    [void]$builder.Append($char)
+  }
+
+  $withoutComments = $builder.ToString()
+  return [regex]::Replace($withoutComments, ',(?=\s*[\}\]])', '')
+}
+
 function Load-JsonObject {
   param(
     [string]$Path,
     [int]$MissingCode,
     [int]$InvalidCode,
     [int]$RootCode,
-    [switch]$AllowMissing
+    [switch]$AllowMissing,
+    [switch]$AllowJsonc
   )
 
   if (-not (Test-Path -LiteralPath $Path)) {
@@ -289,7 +363,7 @@ function Load-JsonObject {
     Fail -Code $MissingCode -Message ''
   }
 
-  $parsed = Read-JsonFile -Path $Path -InvalidCode $InvalidCode
+  $parsed = Read-JsonFile -Path $Path -InvalidCode $InvalidCode -AllowJsonc:$AllowJsonc
   $native = ConvertTo-NativeObject $parsed
   if ($native -isnot [System.Collections.IDictionary]) {
     Fail -Code $RootCode -Message ''
@@ -394,7 +468,7 @@ function Build-PreviewText {
     'strict-ssl=false',
     '@wecode:registry=https://cmc.xxx.com/npm/product_npm/',
     '',
-    '[message-bridge.json]',
+    '[message-bridge.jsonc]',
     ('ak=' + $AkValue),
     ('sk=' + $SkValue)
   )
@@ -448,7 +522,7 @@ function Update-NpmrcFile {
 }
 
 function Update-MessageBridgeFile {
-  $config = Load-JsonObject -Path $messageBridgePath -MissingCode 0 -InvalidCode 21 -RootCode 22 -AllowMissing
+  $config = Load-JsonObject -Path $messageBridgePath -MissingCode 0 -InvalidCode 21 -RootCode 22 -AllowMissing -AllowJsonc
   Ensure-AuthObject -Config $config
   $config['auth']['ak'] = $ak
   $config['auth']['sk'] = $sk
@@ -484,7 +558,7 @@ switch ($Mode) {
   'preview' {
     $opencodeConfig = Load-JsonObject -Path $opencodeJsonPath -MissingCode 11 -InvalidCode 12 -RootCode 13
     if (Test-Path -LiteralPath $messageBridgePath) {
-      [void](Load-JsonObject -Path $messageBridgePath -MissingCode 0 -InvalidCode 21 -RootCode 22)
+      [void](Load-JsonObject -Path $messageBridgePath -MissingCode 0 -InvalidCode 21 -RootCode 22 -AllowJsonc)
     }
 
     $plugins = Get-UpdatedPluginList -Config $opencodeConfig
@@ -495,7 +569,7 @@ switch ($Mode) {
   'apply' {
     [void](Load-JsonObject -Path $opencodeJsonPath -MissingCode 11 -InvalidCode 12 -RootCode 13)
     if (Test-Path -LiteralPath $messageBridgePath) {
-      [void](Load-JsonObject -Path $messageBridgePath -MissingCode 0 -InvalidCode 21 -RootCode 22)
+      [void](Load-JsonObject -Path $messageBridgePath -MissingCode 0 -InvalidCode 21 -RootCode 22 -AllowJsonc)
     }
 
     Copy-WecodeFolder
