@@ -5,6 +5,8 @@
 Digital SDK 是 分身创建小程序和分身服务端交互的中间层SDK，负责两者之间的网络请求交互：
 
 ---
+## 服务端接口域名和文根
+测试环境: https://api.assistant.testuat.testWei.com/assistant-api
 
 ## 1. 创建分身
 
@@ -22,10 +24,10 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| name | String | 是 | 分身名称 |
-| icon | String | 是 | 分身头像地址 |
-| description | String | 是 | 分身简介 |
-| digitalTwintype | string | 是 | 分身类型: `internal`为内部分身,`custom`为自定义分身 |
+| name | string | 是 | 分身名称 |
+| icon | string | 是 | 分身头像地址 |
+| description | string | 是 | 分身简介 |
+| weCrewType | number | 是 | 分身类型: 1为内部分身,0为自定义分身 |
 | agentType | string | 否 | agent类型 |
 
 ### 入参示例
@@ -35,7 +37,7 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
   "name": "分身小白",
   "icon": "/mcloud/xxx",
   "description": "数字分身小白能做...",
-  "digitalTwintype": "internal",
+  "weCrewType": 1,
   "agentType": "员工助手"
 }
 ```
@@ -44,28 +46,33 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| `data` | String | 分身ID |
+| `data` | object | 分身信息 |
+| `data.robotId` | string | 分身机器人ID |
+| `data.partnerAccount` | string | 分身的partnerAccount |
 | `message` | String | 消息，接口正常是`success` |
 
 ### 接口出参示例
 
 ```json
 {
-  "data": "42325235235",
+  "data": {
+    "robotId": "860306",
+    "partnerAccount": "x00123456"
+  },
   "message": "success",
 }
 ```
 
 ### 实现方法
 1. 调用服务端 REST API 创建数字分身：
-   - **URL**: `POST /api/skill/sessions`
+   - **URL**: `POST /v4-1/we-crew/im-register`
    - **请求体**:
      ```json
      {
         "name": "分身小白",
         "icon": "/mcloud/xxx",
         "description": "数字分身小白能做...",
-        "digitalTwintype": "internal",
+        "weCrewType": 1,
         "agentType": "员工助手"
      }
      ```
@@ -73,19 +80,23 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
     ```json
      {
         "code": 200,
-        "data": "860424124",
+        "data": {
+          "robotId": "860306",
+          "partnerAccount": "x00123456"
+        },
         "message": "success",
         "error": ""
      }
      ```
+     - **服务端接口异常响应**:
+     | HttpCode | code | error |
+     |--------|------|------|
+     | 429 | 587013 | 请求太频繁 |
+     | 500 | 587014 | 创建数字分身失败 |
+     | 500 | 587015 | 创建数字分身达到上限 |
+     | 400 | 587016 | 没有数字分身的权限 |
+     
 
-### 错误处理
-
-| 错误码 | 错误消息 | 说明 |
-|--------|----------|------|
-| 1000 | 无效的参数 | 缺少必填参数或参数格式错误 |
-| 6000 | 网络错误 | REST API 连接失败或网络请求失败 |
-| 7000 | 服务端错误 | 服务端接口返回异常结果 |
 
 ---
 
@@ -111,20 +122,22 @@ getAgentType(): Promise<AgentTypeList>
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| agentTypeList | Array<AgentType> | 支持的agent类型列表 |
+| content | Array<AgentType> | 支持的agent类型列表 |
 
 ### 出参示例
 
 ```json
 {
-  "agentTypeList": [
+  "content": [
     {
-      "agentName": "员工助手",
-      "agentIcon": "http:www.test.com/xxx"
+      "name": "员工助手",
+      "icon": "http:www.test.com/xxx",
+      "bizRobotId": "8041241"
     },
     {
-      "agentName": "小微助手",
-      "agentIcon": "http:www.test.com/aaa"
+      "name": "小微助手",
+      "icon": "http:www.test.com/aaa",
+      "bizRobotId": "8041241"
     },
   ]
 }
@@ -133,12 +146,23 @@ getAgentType(): Promise<AgentTypeList>
 ### 实现方法
 
 1. 调用服务端 REST API 获取支持的agent列表：
-   - **URL**: `GET /api/skill/getAgentType`
+   - **URL**: `GET /v4-1/we-crew/inner-assistant/list`
     - **服务端接口响应**:
     ```json
       {
         "code": 200,
-        "data": "860424124",
+        "data": [
+          {
+            "name": "员工助手",
+            "icon": "http:www.test.com/xxx",
+            "bizRobotId": "8041241"
+          },
+          {
+            "name": "小微助手",
+            "icon": "http:www.test.com/aaa",
+            "bizRobotId": "8041241"
+          },
+        ],
         "message": "success",
         "error": ""
       }
@@ -152,5 +176,6 @@ getAgentType(): Promise<AgentTypeList>
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| agentName | string | agent名称 |
-| agentIcon | string | agent图标 |
+| name | string | agent名称 |
+| icon | string | agent图标 |
+| bizRobotId | string | agent对应的业务机器人id |
