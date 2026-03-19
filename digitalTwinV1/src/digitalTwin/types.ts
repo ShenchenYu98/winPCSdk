@@ -3,7 +3,7 @@ export interface CreateDigitalTwinParams {
   icon: string,
   description: string,
   weCrewType: number,
-  agentType?: string
+  bizRobotId?: string
 }
 
 export interface CreateResult {

@@ -32,7 +32,7 @@ export const createDigitalTwin = async (
   const icon = validateRequiredString(params.icon, "icon");
   const description = validateRequiredString(params.description, "description");
   const weCrewType = validateWeCrewType(params.weCrewType);
-  const agentType = normalizeOptionalString(params.agentType);
+  const agentType = normalizeOptionalString(params.bizRobotId);
 
   const payload: CreateDigitalTwinParams = {
     name,
@@ -42,7 +42,7 @@ export const createDigitalTwin = async (
   };
 
   if (agentType) {
-    payload.agentType = agentType;
+    payload.bizRobotId = agentType;
   }
 
   let response: Response;

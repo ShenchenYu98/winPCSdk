@@ -28,7 +28,7 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
 | icon | string | 是 | 分身头像地址 |
 | description | string | 是 | 分身简介 |
 | weCrewType | number | 是 | 分身类型: 1为内部分身,0为自定义分身 |
-| agentType | string | 否 | agent类型 |
+| bizRobotId | string | 否 | 内部助手业务机器人Id |
 
 ### 入参示例
 
@@ -38,7 +38,7 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
   "icon": "/mcloud/xxx",
   "description": "数字分身小白能做...",
   "weCrewType": 1,
-  "agentType": "员工助手"
+  "bizRobotId": "员工助手"
 }
 ```
 
@@ -73,7 +73,7 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
         "icon": "/mcloud/xxx",
         "description": "数字分身小白能做...",
         "weCrewType": 1,
-        "agentType": "员工助手"
+        "bizRobotId": "员工助手"
      }
      ```
     - **服务端接口响应**:
