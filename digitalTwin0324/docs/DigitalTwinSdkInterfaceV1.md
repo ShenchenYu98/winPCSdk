@@ -302,15 +302,15 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetails>
 | --------------- | ------ | ----------------------- |
 | name            | string | 助理名称                |
 | icon            | string | 助理图标                |
-| description     | string | 助理简介                |
+| desc     | string | 助理简介                |
 | moduleId     | string | 助理对应的模块Id                |
-| appId           | string | 助理appId，即助理ak     |
+| appKey           | string | 助理ak     |
 | appSecret       | string | 助理sk                  |
 | partnerAccount  | string | 助理ID                  |
 | createdBy       | string | 创建者的weLinkId        |
 | creatorName     | string | 创建者名称              |
 | creatorNameEn     | string | 创建者英文名称              |
-| ownerWeLinkId   | string | 助理责任人ID            |
+| ownerWelinkId   | string | 助理责任人ID            |
 | ownerName       | string | 助理责任人名称          |
 | ownerNameEn     | string | 助理责任人英文名称      |
 | ownerDeptName   | string | 助理责任部门中文名      |
@@ -323,15 +323,15 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetails>
 {
   "name": "员工助手",
   "icon": "http:www.test.com/xxx",
-  "description": "我是xxx",
+  "desc": "我是xxx",
   "moduleId": "M1000",
   "partnerAccount": "x00_1",
-  "appId": "",
+  "appKey": "",
   "appSecret": "",
   "createdBy": "",
   "creatorName": "",
   "creatorNameEn": "",
-  "ownerWeLinkId": "",
+  "ownerWelinkId": "",
   "ownerName": "",
   "ownerNameEn": "",
   "ownerDeptName": "",
@@ -357,15 +357,15 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetails>
         "data": {
           "name": "员工助手",
           "icon": "http:www.test.com/xxx",
-          "description": "我是xxx",
+          "desc": "我是xxx",
           "partnerAccount": "x00_1",
           "moduleId": "M1000",
-          "appId": "",
+          "appKey": "",
           "appSecret": "",
           "createdBy": "",
           "creatorName": "",
           "creatorNameEn": "",
-          "ownerWeLinkId": "",
+          "ownerWelinkId": "",
           "ownerName": "",
           "ownerNameEn": "",
           "ownerDeptName": "",

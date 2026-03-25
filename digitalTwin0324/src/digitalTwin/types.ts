@@ -46,14 +46,18 @@ export interface queryWeAgentParams {
   partnerAccount: string
 }
 
-export interface WeAgentDetails extends WeAgent {
+export interface WeAgentDetails {
+  name: string,
+  icon: string,
+  desc: string,
   moduleId: string,
-  appId: string,
+  appKey: string,
   appSecret: string,
+  partnerAccount: string,
   createdBy: string,
   creatorName: string,
   creatorNameEn: string,
-  ownerWeLinkId: string,
+  ownerWelinkId: string,
   ownerName: string,
   ownerNameEn: string,
   ownerDeptName: string,
