@@ -6,6 +6,7 @@ import type {
   PageResult,
   ReplyPermissionParams,
   ReplyPermissionResult,
+  Session,
   SendMessageParams,
   SendMessageResult,
   SendMessageToIMResult,
@@ -18,7 +19,15 @@ interface CreateSessionPayload {
   ak?: string;
   title?: string;
   imGroupId?: string;
-  parentAccount?: string;
+}
+
+interface CreateNewSessionPayload {
+  ak: string;
+  title?: string;
+  bussinessDomain: string;
+  bussinessId: string;
+  bussinessType: string;
+  assistantAccount: string;
 }
 
 interface Layer1Response<T> {
@@ -42,7 +51,7 @@ export class SkillServerClient {
     return this.request<PageResult<SkillSession>>(`/api/skill/sessions?${query.toString()}`);
   }
 
-  async getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillSession>> {
+  async getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<Session>> {
     const query = new URLSearchParams({
       page: String(params.page),
       size: String(params.size)
@@ -56,15 +65,15 @@ export class SkillServerClient {
       query.set("ak", params.ak.trim());
     }
 
-    if (params.imGroupId?.trim()) {
-      query.set("imGroupId", params.imGroupId.trim());
+    if (params.bussinessId?.trim()) {
+      query.set("bussinessId", params.bussinessId.trim());
     }
 
-    if (params.partnerAccount?.trim()) {
-      query.set("partnerAccount", params.partnerAccount.trim());
+    if (params.assistantAccount?.trim()) {
+      query.set("assistantAccount", params.assistantAccount.trim());
     }
 
-    return this.request<PageResult<SkillSession>>(`/api/skill/sessions?${query.toString()}`);
+    return this.request<PageResult<Session>>(`/api/skill/sessions?${query.toString()}`);
   }
 
   async createSession(payload: CreateSessionPayload): Promise<SkillSession> {
@@ -74,8 +83,11 @@ export class SkillServerClient {
     });
   }
 
-  async createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
-    return this.createSession(this.normalizeCreateSessionPayload(params));
+  async createNewSession(params: CreateNewSessionParams): Promise<Session> {
+    return this.request<Session>("/api/skill/sessions", {
+      method: "POST",
+      body: JSON.stringify(this.normalizeCreateNewSessionPayload(params))
+    });
   }
 
   async sendMessage(params: SendMessageParams): Promise<SendMessageResult> {
@@ -159,9 +171,7 @@ export class SkillServerClient {
     });
   }
 
-  private normalizeCreateSessionPayload(
-    payload: CreateSessionParams | CreateNewSessionParams
-  ): CreateSessionPayload {
+  private normalizeCreateSessionPayload(payload: CreateSessionParams): CreateSessionPayload {
     const normalized: CreateSessionPayload = {};
 
     if (payload.ak?.trim()) {
@@ -176,8 +186,22 @@ export class SkillServerClient {
       normalized.imGroupId = payload.imGroupId.trim();
     }
 
-    if ("parentAccount" in payload && payload.parentAccount?.trim()) {
-      normalized.parentAccount = payload.parentAccount.trim();
+    return normalized;
+  }
+
+  private normalizeCreateNewSessionPayload(
+    payload: CreateNewSessionParams
+  ): CreateNewSessionPayload {
+    const normalized: CreateNewSessionPayload = {
+      ak: payload.ak.trim(),
+      bussinessDomain: payload.bussinessDomain?.trim() || "miniapp",
+      bussinessId: payload.bussinessId.trim(),
+      bussinessType: payload.bussinessType?.trim() || "direct",
+      assistantAccount: payload.assistantAccount.trim()
+    };
+
+    if (payload.title?.trim()) {
+      normalized.title = payload.title.trim();
     }
 
     return normalized;

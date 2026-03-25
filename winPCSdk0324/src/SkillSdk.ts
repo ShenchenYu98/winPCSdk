@@ -19,6 +19,7 @@ import type {
   RegisterSessionListenerResult,
   ReplyPermissionParams,
   ReplyPermissionResult,
+  Session,
   SendMessageParams,
   SendMessageResult,
   SendMessageToIMParams,
@@ -57,7 +58,7 @@ export class SkillSdk implements SkillSdkApi {
     return this.orchestrator.createSession(params);
   }
 
-  async createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
+  async createNewSession(params: CreateNewSessionParams): Promise<Session> {
     await this.connectionManager.ensureConnected();
     return this.orchestrator.createNewSession(params);
   }
@@ -102,7 +103,7 @@ export class SkillSdk implements SkillSdkApi {
 
   async getHistorySessionsList(
     params: HistorySessionsParams
-  ): Promise<PageResult<SkillSession>> {
+  ): Promise<PageResult<Session>> {
     await this.connectionManager.ensureConnected();
     return this.orchestrator.getHistorySessionsList(params);
   }

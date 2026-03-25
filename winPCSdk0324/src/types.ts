@@ -16,6 +16,21 @@ export interface SkillSession {
   updatedAt: string;
 }
 
+export interface Session {
+  welinkSessionId: string;
+  userId: string;
+  ak: string | null;
+  title: string | null;
+  bussinessDomain: string | null;
+  bussinessType: string | null;
+  bussinessId: string | null;
+  assistantAccount: string | null;
+  status: string;
+  toolSessionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CreateSessionParams {
   ak?: string;
   title?: string;
@@ -23,10 +38,12 @@ export interface CreateSessionParams {
 }
 
 export interface CreateNewSessionParams {
-  ak?: string;
+  ak: string;
   title?: string;
-  imGroupId?: string;
-  parentAccount?: string;
+  bussinessDomain?: string;
+  bussinessId: string;
+  bussinessType?: string;
+  assistantAccount: string;
 }
 
 export interface StopSkillParams {
@@ -58,8 +75,8 @@ export interface HistorySessionsParams {
   size?: number;
   status?: "ACTIVE" | "IDLE" | "CLOSED";
   ak?: string;
-  imGroupId?: string;
-  partnerAccount?: string;
+  bussinessId?: string;
+  assistantAccount?: string;
 }
 
 export interface RegisterSessionListenerParams {
@@ -245,7 +262,7 @@ export interface UnregisterSessionListenerResult {
 
 export interface SkillSdkApi {
   createSession(params: CreateSessionParams): Promise<SkillSession>;
-  createNewSession(params: CreateNewSessionParams): Promise<SkillSession>;
+  createNewSession(params: CreateNewSessionParams): Promise<Session>;
   closeSkill(): Promise<CloseSkillResult>;
   stopSkill(params: StopSkillParams): Promise<StopSkillResult>;
   onSessionStatusChange(params: OnSessionStatusChangeParams): void;
@@ -253,7 +270,7 @@ export interface SkillSdkApi {
   regenerateAnswer(params: RegenerateAnswerParams): Promise<SendMessageResult>;
   sendMessageToIM(params: SendMessageToIMParams): Promise<SendMessageToIMResult>;
   getSessionMessage(params: GetSessionMessageParams): Promise<PageResult<SessionMessage>>;
-  getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillSession>>;
+  getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<Session>>;
   registerSessionListener(
     params: RegisterSessionListenerParams
   ): RegisterSessionListenerResult;

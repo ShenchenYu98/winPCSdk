@@ -9,6 +9,7 @@ import type {
   RegenerateAnswerParams,
   ReplyPermissionParams,
   ReplyPermissionResult,
+  Session,
   SendMessageParams,
   SendMessageResult,
   SendMessageToIMParams,
@@ -28,8 +29,16 @@ export class SessionOrchestrator {
     return this.client.createOrReuseSession(params);
   }
 
-  async createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
-    return this.client.createNewSession(params);
+  async createNewSession(params: CreateNewSessionParams): Promise<Session> {
+    validateRequired(params.ak, "ak");
+    validateRequired(params.bussinessId, "bussinessId");
+    validateRequired(params.assistantAccount, "assistantAccount");
+
+    return this.client.createNewSession({
+      ...params,
+      bussinessDomain: params.bussinessDomain ?? "miniapp",
+      bussinessType: params.bussinessType ?? "direct"
+    });
   }
 
   async sendMessage(params: SendMessageParams): Promise<SendMessageResult> {
@@ -94,7 +103,7 @@ export class SessionOrchestrator {
 
   async getHistorySessionsList(
     params: HistorySessionsParams
-  ): Promise<PageResult<SkillSession>> {
+  ): Promise<PageResult<Session>> {
     return this.client.getHistorySessionsList({
       ...params,
       page: params.page ?? 0,
@@ -138,5 +147,11 @@ export class SessionOrchestrator {
 function validateSessionId(sessionId: string): void {
   if (typeof sessionId !== "string" || !sessionId.trim()) {
     throw createSdkError(1000, "无效的参数: welinkSessionId");
+  }
+}
+
+function validateRequired(value: string, fieldName: string): void {
+  if (typeof value !== "string" || !value.trim()) {
+    throw createSdkError(1000, `无效的参数: ${fieldName}`);
   }
 }
