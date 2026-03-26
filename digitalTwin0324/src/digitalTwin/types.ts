@@ -39,11 +39,12 @@ export interface WeAgent {
   description: string,
   partnerAccount: string,
   bizRobotName: string,
-  bizRobotNameEn: string
+  bizRobotNameEn: string,
+  robotId: string
 }
 
 export interface queryWeAgentParams {
-  partnerAccount: string
+  partnerAccounts: string[]
 }
 
 export interface WeAgentDetails {
@@ -57,6 +58,7 @@ export interface WeAgentDetails {
   createdBy: string,
   creatorName: string,
   creatorNameEn: string,
+  creatorWorkId: string,
   ownerWelinkId: string,
   ownerName: string,
   ownerNameEn: string,
@@ -65,3 +67,5 @@ export interface WeAgentDetails {
   bizRobotId: string,
   weCodeUrl: string
 }
+
+export type WeAgentDetailsArray = WeAgentDetails[]

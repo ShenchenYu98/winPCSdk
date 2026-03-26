@@ -1,13 +1,13 @@
 import {
-  CreateDigitalTwinParams,
-  CreateResult,
   AgentType,
   AgentTypeList,
+  CreateDigitalTwinParams,
+  CreateResult,
   pageParams,
-  WeAgent,
-  WeAgentList,
   queryWeAgentParams,
-  WeAgentDetails
+  WeAgent,
+  WeAgentDetailsArray,
+  WeAgentList
 } from "../types";
 
 const DIGITAL_TWIN_BASE_URL = "https://api.assistant.testuat.testWei.com/assistant-api";
@@ -164,7 +164,7 @@ export const getWeAgentList = async (
     throw buildHttpError(response.status, response.statusText, responseBody);
   }
 
-  if (!isDigitalTwinApiResponse<WeAgent[]>(responseBody)) {
+  if (!isDigitalTwinApiResponse<unknown>(responseBody)) {
     throw createSdkError(SERVER_ERROR_CODE, "服务端错误: 响应格式非法");
   }
 
@@ -175,24 +175,23 @@ export const getWeAgentList = async (
     );
   }
 
-  if (!isWeAgentListData(responseBody.data)) {
-    throw createSdkError(SERVER_ERROR_CODE, "服务端错误: 响应数据非法");
-  }
-
   return {
-    content: responseBody.data
+    content: responseBody.data as WeAgent[]
   };
 };
 
 export const getWeAgentDetails = async (
   params: queryWeAgentParams
-): Promise<WeAgentDetails> => {
-  const partnerAccount = validateRequiredString(params.partnerAccount, "partnerAccount");
+): Promise<WeAgentDetailsArray> => {
+  const partnerAccounts = validatePartnerAccounts(params.partnerAccounts);
+  const encodedPartnerAccounts = partnerAccounts
+    .map((partnerAccount) => encodeURIComponent(partnerAccount))
+    .join(",");
 
   let response: Response;
 
   try {
-    response = await fetch(`${GET_WE_AGENT_DETAILS_URL}/${encodeURIComponent(partnerAccount)}`, {
+    response = await fetch(`${GET_WE_AGENT_DETAILS_URL}/${encodedPartnerAccounts}`, {
       method: "GET",
       credentials: "include"
     });
@@ -206,7 +205,7 @@ export const getWeAgentDetails = async (
     throw buildHttpError(response.status, response.statusText, responseBody);
   }
 
-  if (!isDigitalTwinApiResponse<WeAgentDetails>(responseBody)) {
+  if (!isDigitalTwinApiResponse<unknown>(responseBody)) {
     throw createSdkError(SERVER_ERROR_CODE, "服务端错误: 响应格式非法");
   }
 
@@ -217,11 +216,7 @@ export const getWeAgentDetails = async (
     );
   }
 
-  if (!isWeAgentDetailsData(responseBody.data)) {
-    throw createSdkError(SERVER_ERROR_CODE, "服务端错误: 响应数据非法");
-  }
-
-  return responseBody.data;
+  return responseBody.data as WeAgentDetailsArray;
 };
 
 function createSdkError(errorCode: number, errorMessage: string): DigitalTwinSdkError {
@@ -240,6 +235,28 @@ function validateRequiredString(value: string, fieldName: string): string {
   }
 
   return value.trim();
+}
+
+function validatePartnerAccounts(value: string[]): string[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw createSdkError(
+      INVALID_PARAMETER_ERROR_CODE,
+      "无效的参数: partnerAccounts"
+    );
+  }
+
+  const normalizedValues = value.map((item) => {
+    if (typeof item !== "string" || !item.trim()) {
+      throw createSdkError(
+        INVALID_PARAMETER_ERROR_CODE,
+        "无效的参数: partnerAccounts"
+      );
+    }
+
+    return item.trim();
+  });
+
+  return normalizedValues;
 }
 
 function normalizeOptionalString(value?: string): string | undefined {
@@ -351,22 +368,6 @@ function isCreateDigitalTwinData(value: unknown): value is CreateDigitalTwinData
 
 function isAgentTypeListData(value: unknown): value is AgentType[] {
   return Array.isArray(value) && value.every((item) => isRecord(item));
-}
-
-function isAgentType(value: unknown): value is AgentType {
-  return isRecord(value);
-}
-
-function isWeAgentListData(value: unknown): value is WeAgent[] {
-  return Array.isArray(value) && value.every((item) => isRecord(item));
-}
-
-function isWeAgent(value: unknown): value is WeAgent {
-  return isRecord(value);
-}
-
-function isWeAgentDetailsData(value: unknown): value is WeAgentDetails {
-  return isRecord(value) && !Array.isArray(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

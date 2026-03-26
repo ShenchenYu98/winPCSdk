@@ -112,6 +112,7 @@ const res = await window.Pedesstal.callMethod('method://agentSkills/getWeAgentDe
 | createdBy       | string | 创建者的weLinkId        |
 | creatorName     | string | 创建者名称              |
 | creatorNameEn     | string | 创建者英文名称              |
+| creatorWorkId   | string | creatorWorkId         |
 | ownerWelinkId   | string | 助理责任人ID            |
 | ownerName       | string | 助理责任人名称          |
 | ownerNameEn     | string | 助理责任人英文名称      |
@@ -134,6 +135,7 @@ const res = await window.Pedesstal.callMethod('method://agentSkills/getWeAgentDe
   "createdBy": "",
   "creatorName": "",
   "creatorNameEn": "",
+  "creatorWorkId": "",
   "ownerWelinkId": "",
   "ownerName": "",
   "ownerNameEn": "",
@@ -228,6 +230,7 @@ const resObject = JSON.parse(resString);
 | createdBy       | string | 创建者的weLinkId        |
 | creatorName     | string | 创建者名称              |
 | creatorNameEn     | string | 创建者英文名称              |
+| creatorWorkId   | string | creatorWorkId         |
 | ownerWelinkId   | string | 助理责任人ID            |
 | ownerName       | string | 助理责任人名称          |
 | ownerNameEn     | string | 助理责任人英文名称      |
@@ -250,6 +253,7 @@ const resObject = JSON.parse(resString);
   "createdBy": "",
   "creatorName": "",
   "creatorNameEn": "",
+  "creatorWorkId": "",
   "ownerWelinkId": "",
   "ownerName": "",
   "ownerNameEn": "",
