@@ -1,4 +1,3 @@
-import mockResponses from "../../../mock/mock.json";
 import {
   CreateDigitalTwinParams,
   CreateResult,
@@ -16,13 +15,10 @@ const CREATE_DIGITAL_TWIN_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/im-regist
 const GET_AGENT_TYPE_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/inner-assistant/list`;
 const GET_WE_AGENT_LIST_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/list`;
 const GET_WE_AGENT_DETAILS_URL = `${DIGITAL_TWIN_BASE_URL}/v1/robot-partners`;
-const GET_WE_AGENT_LIST_MOCK_URL = "mock://assistant-api/v4-1/we-crew/list";
-const GET_WE_AGENT_DETAILS_MOCK_URL = "mock://assistant-api/v1/robot-partners";
 
 const INVALID_PARAMETER_ERROR_CODE = 1000;
 const NETWORK_ERROR_CODE = 6000;
 const SERVER_ERROR_CODE = 7000;
-const MOCK_PROTOCOL = "mock:";
 
 interface DigitalTwinSdkError {
   errorCode: number;
@@ -40,23 +36,6 @@ interface CreateDigitalTwinData {
   robotId: string;
   partnerAccount: string;
 }
-
-interface MockResponseConfig {
-  status: number;
-  body: unknown;
-}
-
-interface MockDetailsConfig {
-  default: MockResponseConfig;
-  byPartnerAccount: Record<string, MockResponseConfig>;
-}
-
-interface DigitalTwinMockResponses {
-  getWeAgentList: MockResponseConfig;
-  getWeAgentDetails: MockDetailsConfig;
-}
-
-const typedMockResponses = mockResponses as DigitalTwinMockResponses;
 
 export const createDigitalTwin = async (
   params: CreateDigitalTwinParams
@@ -171,7 +150,7 @@ export const getWeAgentList = async (
   let response: Response;
 
   try {
-    response = await requestDigitalTwin(`${GET_WE_AGENT_LIST_MOCK_URL}?${query.toString()}`, {
+    response = await fetch(`${GET_WE_AGENT_LIST_URL}?${query.toString()}`, {
       method: "GET",
       credentials: "include"
     });
@@ -213,13 +192,10 @@ export const getWeAgentDetails = async (
   let response: Response;
 
   try {
-    response = await requestDigitalTwin(
-      `${GET_WE_AGENT_DETAILS_MOCK_URL}/${encodeURIComponent(partnerAccount)}`,
-      {
-        method: "GET",
-        credentials: "include"
-      }
-    );
+    response = await fetch(`${GET_WE_AGENT_DETAILS_URL}/${encodeURIComponent(partnerAccount)}`, {
+      method: "GET",
+      credentials: "include"
+    });
   } catch {
     throw createSdkError(NETWORK_ERROR_CODE, "网络错误");
   }
@@ -247,72 +223,6 @@ export const getWeAgentDetails = async (
 
   return responseBody.data;
 };
-
-async function requestDigitalTwin(url: string, init: RequestInit): Promise<Response> {
-  if (isMockUrl(url)) {
-    return buildMockResponse(url);
-  }
-
-  return fetch(url, init);
-}
-
-function isMockUrl(url: string): boolean {
-  return url.startsWith(`${MOCK_PROTOCOL}//`);
-}
-
-function buildMockResponse(url: string): Response {
-  const mockResponse = resolveMockBody(url);
-
-  return new Response(JSON.stringify(mockResponse.body), {
-    status: mockResponse.status,
-    statusText: getMockStatusText(mockResponse.status),
-    headers: {
-      "Content-Type": "application/json"
-    }
-  });
-}
-
-function resolveMockBody(url: string): MockResponseConfig {
-  const parsedUrl = new URL(url);
-  const pathname = parsedUrl.pathname;
-
-  if (pathname === "/v4-1/we-crew/list") {
-    return typedMockResponses.getWeAgentList;
-  }
-
-  if (pathname.startsWith("/v1/robot-partners/")) {
-    const partnerAccount = decodeURIComponent(pathname.slice("/v1/robot-partners/".length));
-
-    return typedMockResponses.getWeAgentDetails.byPartnerAccount[partnerAccount]
-      ?? typedMockResponses.getWeAgentDetails.default;
-  }
-
-  return {
-    status: 404,
-    body: {
-      code: 40400,
-      data: null,
-      message: "mock route not found",
-      error: "mock route not found"
-    }
-  };
-}
-
-function getMockStatusText(status: number): string {
-  if (status >= 200 && status < 300) {
-    return "OK";
-  }
-
-  if (status === 404) {
-    return "Not Found";
-  }
-
-  if (status >= 500) {
-    return "Mock Error";
-  }
-
-  return "Error";
-}
 
 function createSdkError(errorCode: number, errorMessage: string): DigitalTwinSdkError {
   return {

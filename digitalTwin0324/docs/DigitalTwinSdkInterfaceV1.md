@@ -288,8 +288,8 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
 
 ### 入参
 
-| 参数名         | 类型   | 必填 | 说明   |
-| -------------- | ------ | ---- | ------ |
+| 参数名          | 类型          | 必填 | 说明       |
+| --------------- | ------------- | ---- | ---------- |
 | partnerAccounts | Array<string> | 是   | 助理ID数组 |
 
 ### 入参示例
@@ -302,9 +302,9 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
 
 ### 出参
 
-| 参数名          | 类型   | 说明                    |
-| --------------- | ------ | ----------------------- |
-| WeAgentDetailsArray            | Array<WeAgentDetails> | 助理详情数组                |
+| 参数名              | 类型                  | 说明         |
+| ------------------- | --------------------- | ------------ |
+| WeAgentDetailsArray | Array<WeAgentDetails> | 助理详情数组 |
 
 ### 出参示例
 
@@ -443,7 +443,9 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
 | pageNumber | number | 页码，最小值1，最大值1000    |
 
 ### WeAgentDetails
+
 | 字段       | 类型   | 说明                         |
+| ---------- | ------ | ---------------------------- |
 | name            | string | 助理名称                |
 | icon            | string | 助理图标                |
 | desc     | string | 助理简介                |
