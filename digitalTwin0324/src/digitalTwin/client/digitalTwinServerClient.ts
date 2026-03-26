@@ -14,7 +14,7 @@ const DIGITAL_TWIN_BASE_URL = "https://api.assistant.testuat.testWei.com/assista
 const CREATE_DIGITAL_TWIN_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/im-register`;
 const GET_AGENT_TYPE_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/inner-assistant/list`;
 const GET_WE_AGENT_LIST_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/list`;
-const GET_WE_AGENT_DETAILS_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew`;
+const GET_WE_AGENT_DETAILS_URL = `${DIGITAL_TWIN_BASE_URL}/v1/robot-partners`;
 
 const INVALID_PARAMETER_ERROR_CODE = 1000;
 const NETWORK_ERROR_CODE = 6000;

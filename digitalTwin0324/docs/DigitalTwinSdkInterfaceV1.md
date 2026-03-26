@@ -343,7 +343,7 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetails>
 ### 实现方法
 
 1. 调用服务端 REST API 获取对应助理的详情：
-   - **URL**: `GET /v4-1/we-crew/{partnerAccount}`
+   - **URL**: `GET /v1/robot-partners/{partnerAccount}`
     - **路径参数**:
     ```json
      {
