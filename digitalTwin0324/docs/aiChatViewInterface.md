@@ -15,7 +15,7 @@ aiChatView 接口文档 描述了助理CUI需要用到的接口
 ### 接口名
 
 ```typescript
-window.Pedesstal.callMethod('method://agentSkills/getWeAgentList',{
+const res = await window.Pedesstal.callMethod('method://agentSkills/getWeAgentList',{
   pageSize: 20,
   pageNumber: 1
 })
@@ -79,7 +79,7 @@ window.Pedesstal.callMethod('method://agentSkills/getWeAgentList',{
 ### 接口名
 
 ```typescript
-window.Pedesstal.callMethod('method://agentSkills/getWeAgentDetails',{
+const res = await window.Pedesstal.callMethod('method://agentSkills/getWeAgentDetails',{
   partnerAccount: 'x_001'
 })
 ```
@@ -153,7 +153,7 @@ window.Pedesstal.callMethod('method://agentSkills/getWeAgentDetails',{
 ### 接口名
 
 ```typescript
-const resString = window.Pedesstal.callMethod('method://agentSkills/saveDb',{
+const resString = await window.Pedesstal.callMethod('method://agentSkills/saveDb',{
     type:'query',
     params:{
       key: 'WeAgentList'
@@ -204,7 +204,7 @@ const resObject = JSON.parse(resString);
 ### 接口名
 
 ```typescript
-const resString = window.Pedesstal.callMethod('method://agentSkills/saveDb',{
+const resString = await window.Pedesstal.callMethod('method://agentSkills/saveDb',{
     type:'query',
     params:{
       key: 'currentWeAgentDetails'
@@ -269,7 +269,7 @@ const resObject = JSON.parse(resString);
 ### 接口名
 
 ```typescript
-window.Pedesstal.callMethod('method://agentSkills/saveDb',{
+const res = await window.Pedesstal.callMethod('method://agentSkills/saveDb',{
     type:'add',
     params:{
       key: 'currentWeAgentDetails',
@@ -289,7 +289,7 @@ window.Pedesstal.callMethod('method://agentSkills/saveDb',{
 ### 接口名
 
 ```typescript
-window.Pedesstal.callMethod('method://agentSkills/saveDb',{
+const res = await window.Pedesstal.callMethod('method://agentSkills/saveDb',{
     type:'add',
     params:{
       key: 'WeAgentList',
