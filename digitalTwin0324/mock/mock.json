@@ -1,0 +1,105 @@
+{
+  "getWeAgentList": {
+    "status": 200,
+    "body": {
+      "code": 200,
+      "data": [
+        {
+          "name": "Paged Agent",
+          "icon": "http://test.com/paged-agent.png",
+          "description": "page specific mock list item",
+          "partnerAccount": "x00_1",
+          "bizRobotName": "Employee Assistant",
+          "bizRobotNameEn": "employeeAssistant"
+        }
+      ],
+      "message": "success",
+      "error": ""
+    }
+  },
+  "getWeAgentDetails": {
+    "default": {
+      "status": 200,
+      "body": {
+        "code": 200,
+        "data": {
+          "name": "agent",
+          "icon": "http://test.com/agent.png",
+          "desc": "assistant",
+          "moduleId": "M1000",
+          "appKey": "515125",
+          "appSecret": "1sget",
+          "partnerAccount": "x00/1 #a",
+          "createdBy": "",
+          "creatorName": "",
+          "creatorNameEn": "",
+          "ownerWelinkId": "",
+          "ownerName": "",
+          "ownerNameEn": "",
+          "ownerDeptName": "",
+          "ownerDeptNameEn": "",
+          "bizRobotId": "",
+          "weCodeUrl": "https://xxx"
+        },
+        "message": "success",
+        "error": ""
+      }
+    },
+    "byPartnerAccount": {
+      "y_001": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "name": "员工助手助理",
+            "icon": "http://test.com/agent.png",
+            "desc": "我是员工助手",
+            "moduleId": "M1000",
+            "appKey": "515125",
+            "appSecret": "1sget",
+            "partnerAccount": "y_001",
+            "createdBy": "",
+            "creatorName": "",
+            "creatorNameEn": "",
+            "ownerWelinkId": "",
+            "ownerName": "",
+            "ownerNameEn": "",
+            "ownerDeptName": "",
+            "ownerDeptNameEn": "",
+            "bizRobotId": "",
+            "weCodeUrl": "https://xxx"
+          },
+          "message": "success",
+          "error": ""
+        }
+      },
+      "c_001": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "name": "CodeAgent助理",
+            "icon": "http://test.com/agent.png",
+            "desc": "我是CodeAgent",
+            "moduleId": "M1000",
+            "appKey": "515125",
+            "appSecret": "1sget",
+            "partnerAccount": "c_001",
+            "createdBy": "",
+            "creatorName": "",
+            "creatorNameEn": "",
+            "ownerWelinkId": "",
+            "ownerName": "",
+            "ownerNameEn": "",
+            "ownerDeptName": "",
+            "ownerDeptNameEn": "",
+            "bizRobotId": "",
+            "weCodeUrl": "https://xxx"
+          },
+          "message": "success",
+          "error": ""
+        }
+      }
+    }
+  }
+}

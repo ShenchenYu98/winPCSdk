@@ -73,4 +73,24 @@
 
 3、非首次进入助理聊天页面时，调用`getHistorySessionsList`获取当前用户历史会话列表，会选取最近更新的会话ID为当前会话ID；
 
-4、在助理聊天页面进行助理切换
+4、在助理聊天页面进行助理切换时，先查询DB获取当前用户已创建助理列表
+  ```typescript
+  // 获取当前用户已创建助理列表
+  window.Pedesstal.callMethod('method://agentSkills/saveDb',{
+    type:'query',
+    params:{
+      key: 'WeAgentList'
+    }
+  })
+  ```
+  若为空则调用`getWeAgentList`从服务端获取数据，然后进行DB存储
+  ```typescript
+  // 存储当前用户已创建助理列表
+  window.Pedesstal.callMethod('method://agentSkills/saveDb',{
+    type:'add',
+    params:{
+      key: 'WeAgentList',
+      value: JSON.stringfy(WeAgentList)
+    }
+  })
+  ```
