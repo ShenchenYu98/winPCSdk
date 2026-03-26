@@ -217,6 +217,7 @@ getWeAgentList(params: pageParams): Promise<WeAgentList>
       "partnerAccount": "x00_1",
       "bizRobotName": "员工助手",
       "bizRobotNameEn": "yuangongzhushou",
+      "robotId": "78985451212",
     },
     {
       "name": "小微助手",
@@ -225,6 +226,7 @@ getWeAgentList(params: pageParams): Promise<WeAgentList>
       "partnerAccount": "x00_1",
       "bizRobotName": "钉钉One",
       "bizRobotNameEn": "dingdingOne",
+      "robotId": "789854124124124",
     },
   ]
 }
@@ -253,6 +255,7 @@ getWeAgentList(params: pageParams): Promise<WeAgentList>
             "partnerAccount": "x00_1",
             "bizRobotName": "员工助手",
             "bizRobotNameEn": "yuangongzhushou",
+            "robotId": "78985451212",
           },
           {
             "name": "小微助手",
@@ -261,6 +264,7 @@ getWeAgentList(params: pageParams): Promise<WeAgentList>
             "partnerAccount": "x00_1",
             "bizRobotName": "钉钉One",
             "bizRobotNameEn": "dingdingOne",
+            "robotId": "789854124124124",
           }
         ],
         "message": "success",
@@ -279,20 +283,20 @@ getWeAgentList(params: pageParams): Promise<WeAgentList>
 ### 接口名
 
 ```typescript
-getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetails>
+getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
 ```
 
 ### 入参
 
 | 参数名         | 类型   | 必填 | 说明   |
 | -------------- | ------ | ---- | ------ |
-| partnerAccount | string | 是   | 助理ID |
+| partnerAccounts | Array<string> | 是   | 助理ID数组 |
 
 ### 入参示例
 
 ```json
 {
-  "partnerAccount": "x00_1"
+  "partnerAccounts": ["x00_1","x00_2"]
 }
 ```
 
@@ -300,63 +304,73 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetails>
 
 | 参数名          | 类型   | 说明                    |
 | --------------- | ------ | ----------------------- |
-| name            | string | 助理名称                |
-| icon            | string | 助理图标                |
-| desc     | string | 助理简介                |
-| moduleId     | string | 助理对应的模块Id                |
-| appKey           | string | 助理ak     |
-| appSecret       | string | 助理sk                  |
-| partnerAccount  | string | 助理ID                  |
-| createdBy       | string | 创建者的weLinkId        |
-| creatorName     | string | 创建者名称              |
-| creatorNameEn     | string | 创建者英文名称              |
-| ownerWelinkId   | string | 助理责任人ID            |
-| ownerName       | string | 助理责任人名称          |
-| ownerNameEn     | string | 助理责任人英文名称      |
-| ownerDeptName   | string | 助理责任部门中文名      |
-| ownerDeptNameEn | string | 助理责任部门英文名      |
-| bizRobotId      | string | agent对应的业务机器人id |
-| weCodeUrl      | string | We码地址 |
+| WeAgentDetailsArray            | Array<WeAgentDetails> | 助理详情数组                |
 
 ### 出参示例
 
 ```json
 {
-  "name": "员工助手",
-  "icon": "http:www.test.com/xxx",
-  "desc": "我是xxx",
-  "moduleId": "M1000",
-  "partnerAccount": "x00_1",
-  "appKey": "",
-  "appSecret": "",
-  "createdBy": "",
-  "creatorName": "",
-  "creatorNameEn": "",
-  "ownerWelinkId": "",
-  "ownerName": "",
-  "ownerNameEn": "",
-  "ownerDeptName": "",
-  "ownerDeptNameEn": "",
-  "bizRobotId": "",
-  "weCodeUrl": "https://xxx"
+  "WeAgentDetailsArray": [
+    {
+      "name": "员工助手",
+     "icon": "http:www.test.com/xxx",
+     "desc": "我是xxx",
+     "moduleId": "M1000",
+     "partnerAccount": "x00_1",
+     "appKey": "",
+     "appSecret": "",
+     "createdBy": "",
+     "creatorName": "",
+     "creatorNameEn": "",
+     "ownerWelinkId": "",
+     "ownerName": "",
+     "ownerNameEn": "",
+     "ownerDeptName": "",
+     "ownerDeptNameEn": "",
+     "bizRobotId": "",
+     "weCodeUrl": "https://xxx"
+    },
+    {
+      "name": "小微助手",
+     "icon": "http:www.test.com/xxx",
+     "desc": "我是xxx",
+     "moduleId": "M2000",
+     "partnerAccount": "x00_2",
+     "appKey": "",
+     "appSecret": "",
+     "createdBy": "",
+     "creatorName": "",
+     "creatorNameEn": "",
+     "ownerWelinkId": "",
+     "ownerName": "",
+     "ownerNameEn": "",
+     "ownerDeptName": "",
+     "ownerDeptNameEn": "",
+     "bizRobotId": "",
+     "weCodeUrl": "https://xxx"
+    }
+  ]
 }
 ```
 
 ### 实现方法
 
 1. 调用服务端 REST API 获取对应助理的详情：
-   - **URL**: `GET /v1/robot-partners/{partnerAccount}`
+   - **URL**: `GET /v1/robot-partners/{partnerAccounts}`
     - **路径参数**:
     ```json
      {
-       "partnerAccount": "x005_1"
+       "partnerAccounts": ["x00_1","x00_2"]
      }
      ```
+    - **请求地址示例**:
+    `GET /v1/robot-partners/x00_1,x00_2`
     - **服务端接口响应**:
     ```json
       {
         "code": 200,
-        "data": {
+        "data": [
+          {
           "name": "员工助手",
           "icon": "http:www.test.com/xxx",
           "desc": "我是xxx",
@@ -375,6 +389,26 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetails>
           "bizRobotId": "",
           "weCodeUrl": "https://xxx"
         },
+        {
+          "name": "小微助手",
+          "icon": "http:www.test.com/xxx",
+          "desc": "我是xxx",
+          "partnerAccount": "x00_2",
+          "moduleId": "M2000",
+          "appKey": "",
+          "appSecret": "",
+          "createdBy": "",
+          "creatorName": "",
+          "creatorNameEn": "",
+          "ownerWelinkId": "",
+          "ownerName": "",
+          "ownerNameEn": "",
+          "ownerDeptName": "",
+          "ownerDeptNameEn": "",
+          "bizRobotId": "",
+          "weCodeUrl": "https://xxx"
+        }
+        ],
         "message": "success",
         "error": ""
       }
@@ -407,3 +441,23 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetails>
 | ---------- | ------ | ---------------------------- |
 | pageSize   | number | 分页大小，最小值1，最大值100 |
 | pageNumber | number | 页码，最小值1，最大值1000    |
+
+### WeAgentDetails
+| 字段       | 类型   | 说明                         |
+| name            | string | 助理名称                |
+| icon            | string | 助理图标                |
+| desc     | string | 助理简介                |
+| moduleId     | string | 助理对应的模块Id                |
+| appKey           | string | 助理ak     |
+| appSecret       | string | 助理sk                  |
+| partnerAccount  | string | 助理ID                  |
+| createdBy       | string | 创建者的weLinkId        |
+| creatorName     | string | 创建者名称              |
+| creatorNameEn     | string | 创建者英文名称              |
+| ownerWelinkId   | string | 助理责任人ID            |
+| ownerName       | string | 助理责任人名称          |
+| ownerNameEn     | string | 助理责任人英文名称      |
+| ownerDeptName   | string | 助理责任部门中文名      |
+| ownerDeptNameEn | string | 助理责任部门英文名      |
+| bizRobotId      | string | agent对应的业务机器人id |
+| weCodeUrl      | string | We码地址 |
