@@ -316,6 +316,7 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetails>
 | ownerDeptName   | string | 助理责任部门中文名      |
 | ownerDeptNameEn | string | 助理责任部门英文名      |
 | bizRobotId      | string | agent对应的业务机器人id |
+| weCodeUrl      | string | We码地址 |
 
 ### 出参示例
 
@@ -336,7 +337,8 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetails>
   "ownerNameEn": "",
   "ownerDeptName": "",
   "ownerDeptNameEn": "",
-  "bizRobotId": ""
+  "bizRobotId": "",
+  "weCodeUrl": "https://xxx"
 }
 ```
 
@@ -370,7 +372,8 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetails>
           "ownerNameEn": "",
           "ownerDeptName": "",
           "ownerDeptNameEn": "",
-          "bizRobotId": ""
+          "bizRobotId": "",
+          "weCodeUrl": "https://xxx"
         },
         "message": "success",
         "error": ""

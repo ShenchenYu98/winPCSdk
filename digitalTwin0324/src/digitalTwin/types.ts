@@ -62,5 +62,6 @@ export interface WeAgentDetails {
   ownerNameEn: string,
   ownerDeptName: string,
   ownerDeptNameEn: string,
-  bizRobotId: string
+  bizRobotId: string,
+  weCodeUrl: string
 }
