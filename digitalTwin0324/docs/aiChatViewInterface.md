@@ -301,3 +301,21 @@ const res = await window.Pedesstal.callMethod('method://agentSkills/saveDb',{
     }
   })
 ```
+
+## 6. 新建会话列表
+
+### 接口说明
+
+新建会话
+
+### 接口名
+
+```typescript
+const res = await window.Pedesstal.callMethod('method://agentSkills/saveDb',{
+    type:'add',
+    params:{
+      key: 'WeAgentList',
+      value: JSON.stringfy(WeAgentList)
+    }
+  })
+```

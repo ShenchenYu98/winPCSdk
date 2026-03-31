@@ -54,6 +54,7 @@ export interface WeAgentDetails {
   moduleId: string,
   appKey: string,
   appSecret: string,
+  id: string,
   partnerAccount: string,
   createdBy: string,
   creatorName: string,
@@ -65,6 +66,8 @@ export interface WeAgentDetails {
   ownerDeptName: string,
   ownerDeptNameEn: string,
   bizRobotId: string,
+  bizRobotName: string,
+  bizRobotNameEn: string,
   weCodeUrl: string
 }
 

@@ -313,43 +313,49 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
   "WeAgentDetailsArray": [
     {
       "name": "员工助手",
-     "icon": "http:www.test.com/xxx",
-     "desc": "我是xxx",
-     "partnerAccount": "x00_1",
-     "bizRobotId": "",
-     "ownerWelinkId": "",
-     "ownerName": "",
-     "ownerNameEn": "",
-     "ownerDeptName": "",
-     "ownerDeptNameEn": "",
-     "appKey": "",
-     "appSecret": "",
-     "moduleId": "M1000",
-     "createdBy": "",
-     "creatorName": "",
-     "creatorNameEn": "",
-     "weCodeUrl": "https://xxx",
-     "creatorWorkId": "",
+      "icon": "http://www.test.com/xxx",
+      "desc": "我是xxx",
+      "partnerAccount": "x00_1",
+      "bizRobotId": "",
+      "bizRobotName": "员工助手",
+      "bizRobotNameEn": "employee_assistant",
+      "ownerWelinkId": "",
+      "ownerName": "",
+      "ownerNameEn": "",
+      "ownerDeptName": "",
+      "ownerDeptNameEn": "",
+      "id": "78985451212",
+      "appKey": "",
+      "appSecret": "",
+      "moduleId": "M1000",
+      "createdBy": "",
+      "creatorName": "",
+      "creatorNameEn": "",
+      "weCodeUrl": "https://xxx",
+      "creatorWorkId": ""
     },
     {
-      "name": "小微助手",
-     "icon": "http:www.test.com/xxx",
-     "desc": "我是xxx",
-     "partnerAccount": "x00_2",
-     "bizRobotId": "",
-     "ownerWelinkId": "",
-     "ownerName": "",
-     "ownerNameEn": "",
-     "ownerDeptName": "",
-     "ownerDeptNameEn": "",
-     "appKey": "",
-     "appSecret": "",
-     "moduleId": "M1000",
-     "createdBy": "",
-     "creatorName": "",
-     "creatorNameEn": "",
-     "weCodeUrl": "https://xxx",
-     "creatorWorkId": "",
+      "name": "员工助手",
+      "icon": "http://www.test.com/xxx",
+      "desc": "我是xxx",
+      "partnerAccount": "x00_1",
+      "bizRobotId": "",
+      "bizRobotName": "员工助手",
+      "bizRobotNameEn": "employee_assistant",
+      "ownerWelinkId": "",
+      "ownerName": "",
+      "ownerNameEn": "",
+      "ownerDeptName": "",
+      "ownerDeptNameEn": "",
+      "id": "78985451212",
+      "appKey": "",
+      "appSecret": "",
+      "moduleId": "M1000",
+      "createdBy": "",
+      "creatorName": "",
+      "creatorNameEn": "",
+      "weCodeUrl": "https://xxx",
+      "creatorWorkId": ""
     }
   ]
 }
@@ -373,44 +379,50 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
         "code": 200,
         "data": [
           {
-          "name": "员工助手",
-         "icon": "http:www.test.com/xxx",
-         "desc": "我是xxx",
-         "partnerAccount": "x00_1",
-         "bizRobotId": "",
-         "ownerWelinkId": "",
-         "ownerName": "",
-         "ownerNameEn": "",
-         "ownerDeptName": "",
-         "ownerDeptNameEn": "",
-         "appKey": "",
-         "appSecret": "",
-         "moduleId": "M1000",
-         "createdBy": "",
-         "creatorName": "",
-         "creatorNameEn": "",
-         "weCodeUrl": "https://xxx",
-         "creatorWorkId": "",
+            "name": "员工助手",
+            "icon": "http://www.test.com/xxx",
+            "desc": "我是xxx",
+            "partnerAccount": "x00_1",
+            "bizRobotId": "",
+            "bizRobotName": "员工助手",
+            "bizRobotNameEn": "employee_assistant",
+            "ownerWelinkId": "",
+            "ownerName": "",
+            "ownerNameEn": "",
+            "ownerDeptName": "",
+            "ownerDeptNameEn": "",
+            "id": "78985451212",
+            "appKey": "",
+            "appSecret": "",
+            "moduleId": "M1000",
+            "createdBy": "",
+            "creatorName": "",
+            "creatorNameEn": "",
+            "weCodeUrl": "https://xxx",
+            "creatorWorkId": ""
         },
         {
-          "name": "小微助手",
-     "icon": "http:www.test.com/xxx",
-     "desc": "我是xxx",
-     "partnerAccount": "x00_2",
-     "bizRobotId": "",
-     "ownerWelinkId": "",
-     "ownerName": "",
-     "ownerNameEn": "",
-     "ownerDeptName": "",
-     "ownerDeptNameEn": "",
-     "appKey": "",
-     "appSecret": "",
-     "moduleId": "M1000",
-     "createdBy": "",
-     "creatorName": "",
-     "creatorNameEn": "",
-     "weCodeUrl": "https://xxx",
-     "creatorWorkId": "",
+          "name": "员工助手",
+          "icon": "http://www.test.com/xxx",
+          "desc": "我是xxx",
+          "partnerAccount": "x00_1",
+          "bizRobotId": "",
+          "bizRobotName": "员工助手",
+          "bizRobotNameEn": "employee_assistant",
+          "ownerWelinkId": "",
+          "ownerName": "",
+          "ownerNameEn": "",
+          "ownerDeptName": "",
+          "ownerDeptNameEn": "",
+          "id": "78985451212",
+          "appKey": "",
+          "appSecret": "",
+          "moduleId": "M1000",
+          "createdBy": "",
+          "creatorName": "",
+          "creatorNameEn": "",
+          "weCodeUrl": "https://xxx",
+          "creatorWorkId": ""
         }
         ],
         "message": "success",
@@ -453,18 +465,21 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
 | name            | string | 助理名称                |
 | icon            | string | 助理图标                |
 | desc            | string | 助理简介                |
-| moduleId        | string | 助理对应的模块Id        |
-| appKey          | string | 助理ak                  |
-| appSecret       | string | 助理sk                  |
 | partnerAccount  | string | 助理ID                  |
-| createdBy       | string | 创建者的weLinkId        |
-| creatorName     | string | 创建者名称              |
-| creatorNameEn   | string | 创建者英文名称          |
-| creatorWorkId   | string | creatorWorkId         |
+| bizRobotId      | string | agent对应的业务机器人id |
+| bizRobotName      | string | agent对应的业务机器人名称 |
+| bizRobotNameEn      | string | agent对应的业务机器人英文名 |
 | ownerWelinkId   | string | 助理责任人ID            |
 | ownerName       | string | 助理责任人名称          |
 | ownerNameEn     | string | 助理责任人英文名称      |
 | ownerDeptName   | string | 助理责任部门中文名      |
 | ownerDeptNameEn | string | 助理责任部门英文名      |
-| bizRobotId      | string | agent对应的业务机器人id |
+| id | string |    助理Id   |
+| appKey          | string | 助理ak                  |
+| appSecret       | string | 助理sk                  |
+| moduleId        | string | 助理对应的模块Id        |
+| createdBy       | string | 创建者的weLinkId        |
+| creatorName     | string | 创建者名称              |
+| creatorNameEn   | string | 创建者英文名称          |
 | weCodeUrl       | string | We码地址                |
+| creatorWorkId   | string | creatorWorkId         |
