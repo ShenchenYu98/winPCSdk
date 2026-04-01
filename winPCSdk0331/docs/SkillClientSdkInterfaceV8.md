@@ -1535,6 +1535,7 @@ IM 客户端调用
 ### 接口说明
 
 获取用户历史会话列表。
+支持通过新增入参 `businessSessionDomain` 按会话来源域过滤（`miniapp` / `im`）。
 
 ### 接口名
 
@@ -1552,6 +1553,7 @@ getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillS
 | ak | string | 否 |   按agent ak过滤 |
 | bussinessId | string | 否 | 按会话所属Id过滤，单聊为用户Id，群聊为群Id  |
 | assistantAccount | string | 否 |   按助理Id过滤 |
+| businessSessionDomain | string | 否 | 会话来源域：`miniapp` / `im` |
 
 
 ### 入参示例
@@ -1560,6 +1562,7 @@ getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillS
 {
   "ak": "ak_xxxxxxxx",
   "bussinessId": "group_abc123",
+  "businessSessionDomain": "miniapp",
   "page": 0,
   "size": 50,
   "status": "IDLE",
@@ -1615,6 +1618,7 @@ getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillS
      {
        "ak": "ak_xxxxxxxx",
        "bussinessId": "group_abc123",
+       "businessSessionDomain": "miniapp",
        "page": 0,
        "size": 50,
        "status": "IDLE",
@@ -1637,6 +1641,7 @@ try {
   const sessionsList = await getHistorySessionsList({
     ak: "ak_xxxxxxxx",
     bussinessId: "group_abc123",
+    businessSessionDomain: "miniapp",
     page: 0,
     size: 50,
     status: "IDLE",

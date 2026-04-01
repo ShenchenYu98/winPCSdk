@@ -74,6 +74,10 @@ export class SkillServerClient {
       query.set("assistantAccount", params.assistantAccount.trim());
     }
 
+    if (params.businessSessionDomain?.trim()) {
+      query.set("businessSessionDomain", params.businessSessionDomain.trim());
+    }
+
     return this.request<PageResult<Session>>(`/api/skill/sessions?${query.toString()}`);
   }
 

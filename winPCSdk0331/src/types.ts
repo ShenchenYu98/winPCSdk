@@ -83,6 +83,7 @@ export interface HistorySessionsParams {
   ak?: string;
   bussinessId?: string;
   assistantAccount?: string;
+  businessSessionDomain?: "miniapp" | "im";
 }
 
 export interface RegisterSessionListenerParams {
