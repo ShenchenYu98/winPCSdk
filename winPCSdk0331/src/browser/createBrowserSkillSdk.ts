@@ -4,6 +4,8 @@ import type { SkillSdkApi } from "../types";
 
 export const DEFAULT_SKILL_SDK_BASE_URL = "http://api.openplatform.hisuat.huawei.com/skill/api";
 export const DEFAULT_SKILL_SDK_WS_URL = "ws://api.openplatform.hisuat.huawei.com/skill/api/ws/skill/stream";
+const HEARTBEAT_INTERVAL_MS = 30_000;
+const HEARTBEAT_PAYLOAD = '{"action":"ping"}';
 
 export interface BrowserSkillSdkOptions {
   baseUrl?: string;
@@ -28,6 +30,7 @@ export class BrowserWebSocketConnection implements RealtimeConnection {
   private state: ConnectionState = "idle";
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
+  private heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
   private manualClose = false;
   private initialConnectPromise: Promise<void> | null = null;
   private initialResolve: (() => void) | null = null;
@@ -70,6 +73,7 @@ export class BrowserWebSocketConnection implements RealtimeConnection {
     this.manualClose = true;
     this.state = "closing";
     this.clearReconnectTimer();
+    this.stopHeartbeat();
     this.socket?.close();
     this.socket = null;
     this.resetInitialConnectPromise();
@@ -84,6 +88,7 @@ export class BrowserWebSocketConnection implements RealtimeConnection {
       this.state = "open";
       this.clearReconnectTimer();
       this.reconnectAttempt = 0;
+      this.scheduleHeartbeat();
 
       if (!this.hasOpened) {
         this.hasOpened = true;
@@ -97,7 +102,10 @@ export class BrowserWebSocketConnection implements RealtimeConnection {
       }
     });
 
-    socket.addEventListener("message", (event) => this.handlers?.onMessage(event.data));
+    socket.addEventListener("message", (event) => {
+      this.handlers?.onMessage(event.data);
+      this.resetHeartbeat();
+    });
 
     socket.addEventListener("error", () => {
       const error = new Error("WebSocket connection failed");
@@ -115,6 +123,7 @@ export class BrowserWebSocketConnection implements RealtimeConnection {
       const reason = event.reason || "connection closed";
       const reconnecting = !this.manualClose && this.hasOpened;
 
+      this.stopHeartbeat();
       this.handlers?.onClose(reason, { reconnecting });
 
       if (this.manualClose || !this.hasOpened) {
@@ -148,6 +157,34 @@ export class BrowserWebSocketConnection implements RealtimeConnection {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+  }
+
+  private scheduleHeartbeat(): void {
+    this.stopHeartbeat();
+
+    if (this.state !== "open") {
+      return;
+    }
+
+    this.heartbeatTimer = setTimeout(() => {
+      if (this.state !== "open") {
+        return;
+      }
+
+      this.send(HEARTBEAT_PAYLOAD);
+      this.scheduleHeartbeat();
+    }, HEARTBEAT_INTERVAL_MS);
+  }
+
+  private resetHeartbeat(): void {
+    this.scheduleHeartbeat();
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearTimeout(this.heartbeatTimer);
+      this.heartbeatTimer = null;
     }
   }
 
