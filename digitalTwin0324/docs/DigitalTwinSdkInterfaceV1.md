@@ -444,6 +444,137 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
 
 ---
 
+## 5. 更新个人助理信息
+
+### 接口说明
+
+更新用户已创建个人助理信息
+
+### 接口名
+
+```typescript
+updateWeAgent(params: updateParams): Promise<updateResult>
+```
+
+### 入参
+
+| 参数名     | 类型   | 必填 | 说明                         |
+| ---------- | ------ | ---- | ---------------------------- |
+| partnerAccount   | string | 是   | 助理账号 |
+| robotId | string | 否   | 助理机器人Id，partnerAccount或robotId二选一，优先partnerAccount   |
+| name        | string | 是   | 助理名称                            |
+| icon        | string | 是   | 助理头像地址                        |
+| description | string | 是   | 助理简介                            |
+
+### 入参示例
+
+```json
+{
+  "partnerAccount": "dig_001",
+  "name": "更新名称",
+  "icon": "/mocloud/xxx",
+  "description": "更新简介",
+}
+```
+
+### 出参
+
+| 参数名  | 类型           | 说明                  |
+| ------- | -------------- | --------------------- |
+| updateResult | string | 助理信息更新结果 |
+
+### 出参示例
+
+```json
+{
+  "updateResult": "success"
+}
+```
+
+### 实现方法
+
+1. 调用服务端 REST API 获取支持的agent列表：
+   - **URL**: `PUT /v4-1/we-crew`
+    - **请求参数**:
+    ```json
+     {
+      "partnerAccount": "dig_001",
+      "name": "更新名称",
+      "icon": "/mocloud/xxx",
+      "description": "更新简介",
+     }
+     ```
+    - **服务端接口响应**:
+    ```json
+      {
+        "code": 200,
+        "message": "success",
+        "error": "",
+        "errorEn": "",
+      }
+      ```
+
+## 6. 删除助理
+
+### 接口说明
+
+删除用户已创建的某个助理
+
+### 接口名
+
+```typescript
+deleteWeAgent(params: deleteParams): Promise<deleteResult>
+```
+
+### 入参
+
+| 参数名     | 类型   | 必填 | 说明                         |
+| ---------- | ------ | ---- | ---------------------------- |
+| partnerAccount   | string | 是   | 助理账号 |
+| robotId | string | 否   | 助理机器人Id，partnerAccount或robotId二选一，优先partnerAccount   |
+
+### 入参示例
+
+```json
+{
+  "partnerAccount": "dig_001"
+}
+```
+
+### 出参
+
+| 参数名  | 类型           | 说明                  |
+| ------- | -------------- | --------------------- |
+| deleteResult | string | 助理删除结果 |
+
+### 出参示例
+
+```json
+{
+  "deleteResult": "success"
+}
+```
+
+### 实现方法
+
+1. 调用服务端 REST API 获取支持的agent列表：
+   - **URL**: `DELETE /v4-1/we-crew?partnerAccount={partnerAccount}&robotId={robotId}`
+    - **删除参数**:
+    ```json
+     {
+      "partnerAccount": "dig_001",
+     }
+     ```
+    - **服务端接口响应**:
+    ```json
+      {
+        "code": 200,
+        "message": "success",
+        "error": "",
+        "errorEn": "",
+      }
+      ```
+
 ## 数据类型定义
 
 ### AgentType
@@ -498,3 +629,20 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
 | weCodeUrl       | string | We码地址                |
 | creatorWorkId   | string | creatorWorkId         |
 | creatorW3Account   | string | agent创建人W3账号         |
+
+### updateParams
+
+| 字段       | 类型   | 说明                         |
+| ---------- | ------ | ---------------------------- |
+| partnerAccount   | string  | 助理账号 |
+| robotId | string | 助理机器人Id，partnerAccount或robotId二选一，优先partnerAccount   |
+| name        | string |  助理名称                            |
+| icon        | string |  助理头像地址                        |
+| description | string |  助理简介                            |
+
+### deleteParams
+
+| 字段       | 类型   | 说明                         |
+| ---------- | ------ | ---------------------------- |
+| partnerAccount   | string  | 助理账号 |
+| robotId | string | 助理机器人Id，partnerAccount或robotId二选一，优先partnerAccount   |

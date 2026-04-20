@@ -47,6 +47,19 @@ export interface queryWeAgentParams {
   partnerAccounts: string[]
 }
 
+export interface updateParams {
+  partnerAccount?: string,
+  robotId?: string,
+  name: string,
+  icon: string,
+  description: string
+}
+
+export interface deleteParams {
+  partnerAccount?: string,
+  robotId?: string
+}
+
 export interface WeAgentDetails {
   name: string,
   icon: string,
@@ -75,3 +88,5 @@ export interface WeAgentDetails {
 }
 
 export type WeAgentDetailsArray = WeAgentDetails[]
+export type updateResult = string
+export type deleteResult = string

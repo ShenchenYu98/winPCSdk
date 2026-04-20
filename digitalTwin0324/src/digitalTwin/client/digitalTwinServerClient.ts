@@ -3,8 +3,12 @@ import {
   AgentTypeList,
   CreateDigitalTwinParams,
   CreateResult,
+  deleteParams,
+  deleteResult,
   pageParams,
   queryWeAgentParams,
+  updateParams,
+  updateResult,
   WeAgent,
   WeAgentDetailsArray,
   WeAgentList
@@ -15,6 +19,8 @@ const CREATE_DIGITAL_TWIN_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/im-regist
 const GET_AGENT_TYPE_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/inner-assistant/list`;
 const GET_WE_AGENT_LIST_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/list`;
 const GET_WE_AGENT_DETAILS_URL = `${DIGITAL_TWIN_BASE_URL}/v1/robot-partners`;
+const UPDATE_WE_AGENT_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew`;
+const DELETE_WE_AGENT_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew`;
 
 const INVALID_PARAMETER_ERROR_CODE = 1000;
 const NETWORK_ERROR_CODE = 6000;
@@ -69,7 +75,7 @@ export const createDigitalTwin = async (
       body: JSON.stringify(payload)
     });
   } catch {
-    throw createSdkError(NETWORK_ERROR_CODE, "网络错误");
+    throw createSdkError(NETWORK_ERROR_CODE, "Network error");
   }
 
   const responseBody = await parseResponseBody(response);
@@ -79,18 +85,18 @@ export const createDigitalTwin = async (
   }
 
   if (!isDigitalTwinApiResponse<CreateDigitalTwinData>(responseBody)) {
-    throw createSdkError(SERVER_ERROR_CODE, "服务端错误: 响应格式非法");
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response format");
   }
 
   if (responseBody.code !== 200) {
     throw createSdkError(
       typeof responseBody.code === "number" ? responseBody.code : SERVER_ERROR_CODE,
-      getErrorMessage(responseBody, "服务端错误")
+      getErrorMessage(responseBody, "Server error")
     );
   }
 
   if (!isCreateDigitalTwinData(responseBody.data)) {
-    throw createSdkError(SERVER_ERROR_CODE, "服务端错误: 响应数据非法");
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response data");
   }
 
   return {
@@ -108,7 +114,7 @@ export const getAgentType = async (): Promise<AgentTypeList> => {
       credentials: "include"
     });
   } catch {
-    throw createSdkError(NETWORK_ERROR_CODE, "网络错误");
+    throw createSdkError(NETWORK_ERROR_CODE, "Network error");
   }
 
   const responseBody = await parseResponseBody(response);
@@ -118,18 +124,18 @@ export const getAgentType = async (): Promise<AgentTypeList> => {
   }
 
   if (!isDigitalTwinApiResponse<AgentType[]>(responseBody)) {
-    throw createSdkError(SERVER_ERROR_CODE, "服务端错误: 响应格式非法");
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response format");
   }
 
   if (responseBody.code !== 200) {
     throw createSdkError(
       typeof responseBody.code === "number" ? responseBody.code : SERVER_ERROR_CODE,
-      getErrorMessage(responseBody, "服务端错误")
+      getErrorMessage(responseBody, "Server error")
     );
   }
 
   if (!isAgentTypeListData(responseBody.data)) {
-    throw createSdkError(SERVER_ERROR_CODE, "服务端错误: 响应数据非法");
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response data");
   }
 
   return {
@@ -155,7 +161,7 @@ export const getWeAgentList = async (
       credentials: "include"
     });
   } catch {
-    throw createSdkError(NETWORK_ERROR_CODE, "网络错误");
+    throw createSdkError(NETWORK_ERROR_CODE, "Network error");
   }
 
   const responseBody = await parseResponseBody(response);
@@ -165,13 +171,13 @@ export const getWeAgentList = async (
   }
 
   if (!isDigitalTwinApiResponse<unknown>(responseBody)) {
-    throw createSdkError(SERVER_ERROR_CODE, "服务端错误: 响应格式非法");
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response format");
   }
 
   if (responseBody.code !== 200) {
     throw createSdkError(
       typeof responseBody.code === "number" ? responseBody.code : SERVER_ERROR_CODE,
-      getErrorMessage(responseBody, "服务端错误")
+      getErrorMessage(responseBody, "Server error")
     );
   }
 
@@ -196,7 +202,7 @@ export const getWeAgentDetails = async (
       credentials: "include"
     });
   } catch {
-    throw createSdkError(NETWORK_ERROR_CODE, "网络错误");
+    throw createSdkError(NETWORK_ERROR_CODE, "Network error");
   }
 
   const responseBody = await parseResponseBody(response);
@@ -206,17 +212,126 @@ export const getWeAgentDetails = async (
   }
 
   if (!isDigitalTwinApiResponse<unknown>(responseBody)) {
-    throw createSdkError(SERVER_ERROR_CODE, "服务端错误: 响应格式非法");
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response format");
   }
 
   if (responseBody.code !== 200) {
     throw createSdkError(
       typeof responseBody.code === "number" ? responseBody.code : SERVER_ERROR_CODE,
-      getErrorMessage(responseBody, "服务端错误")
+      getErrorMessage(responseBody, "Server error")
     );
   }
 
   return responseBody.data as WeAgentDetailsArray;
+};
+
+export const updateWeAgent = async (
+  params: updateParams
+): Promise<updateResult> => {
+  const name = validateRequiredString(params.name, "name");
+  const icon = validateRequiredString(params.icon, "icon");
+  const description = validateRequiredString(params.description, "description");
+  const partnerAccount = normalizeOptionalString(params.partnerAccount);
+  const robotId = normalizeOptionalString(params.robotId);
+
+  const payload: updateParams = {
+    name,
+    icon,
+    description
+  };
+
+  if (partnerAccount) {
+    payload.partnerAccount = partnerAccount;
+  }
+
+  if (robotId) {
+    payload.robotId = robotId;
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(UPDATE_WE_AGENT_URL, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: "include",
+      body: JSON.stringify(payload)
+    });
+  } catch {
+    throw createSdkError(NETWORK_ERROR_CODE, "Network error");
+  }
+
+  const responseBody = await parseResponseBody(response);
+
+  if (!response.ok) {
+    throw buildHttpError(response.status, response.statusText, responseBody);
+  }
+
+  if (!isDigitalTwinApiResponse<unknown>(responseBody)) {
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response format");
+  }
+
+  if (responseBody.code !== 200) {
+    throw createSdkError(
+      typeof responseBody.code === "number" ? responseBody.code : SERVER_ERROR_CODE,
+      getErrorMessage(responseBody, "Server error")
+    );
+  }
+
+  return getSuccessMessage(responseBody.message);
+};
+
+export const deleteWeAgent = async (
+  params: deleteParams
+): Promise<deleteResult> => {
+  const partnerAccount = normalizeOptionalString(params.partnerAccount);
+  const robotId = normalizeOptionalString(params.robotId);
+  const query = new URLSearchParams();
+
+  if (partnerAccount) {
+    query.set("partnerAccount", partnerAccount);
+  }
+
+  if (robotId) {
+    query.set("robotId", robotId);
+  }
+
+  const queryString = query.toString();
+  const requestUrl = queryString
+    ? `${DELETE_WE_AGENT_URL}?${queryString}`
+    : DELETE_WE_AGENT_URL;
+
+  let response: Response;
+
+  try {
+    response = await fetch(requestUrl, {
+      method: "DELETE",
+      credentials: "include"
+    });
+  } catch {
+    throw createSdkError(NETWORK_ERROR_CODE, "Network error");
+  }
+
+  const responseBody = await parseResponseBody(response);
+
+  if (!response.ok) {
+    throw buildHttpError(response.status, response.statusText, responseBody);
+  }
+
+  if (!isDigitalTwinApiResponse<unknown>(responseBody)) {
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response format");
+  }
+
+  if (responseBody.code !== 200) {
+    throw createSdkError(
+      typeof responseBody.code === "number" ? responseBody.code : SERVER_ERROR_CODE,
+      getErrorMessage(responseBody, "Server error")
+    );
+  }
+
+  return getSuccessMessage(responseBody.message);
 };
 
 function createSdkError(errorCode: number, errorMessage: string): DigitalTwinSdkError {
@@ -230,7 +345,7 @@ function validateRequiredString(value: string, fieldName: string): string {
   if (typeof value !== "string" || !value.trim()) {
     throw createSdkError(
       INVALID_PARAMETER_ERROR_CODE,
-      `无效的参数: ${fieldName}`
+      `Invalid parameter: ${fieldName}`
     );
   }
 
@@ -241,7 +356,7 @@ function validatePartnerAccounts(value: string[]): string[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw createSdkError(
       INVALID_PARAMETER_ERROR_CODE,
-      "无效的参数: partnerAccounts"
+      "Invalid parameter: partnerAccounts"
     );
   }
 
@@ -249,7 +364,7 @@ function validatePartnerAccounts(value: string[]): string[] {
     if (typeof item !== "string" || !item.trim()) {
       throw createSdkError(
         INVALID_PARAMETER_ERROR_CODE,
-        "无效的参数: partnerAccounts"
+        "Invalid parameter: partnerAccounts"
       );
     }
 
@@ -272,7 +387,7 @@ function validateWeCrewType(value: number): 0 | 1 {
   if (value !== 0 && value !== 1) {
     throw createSdkError(
       INVALID_PARAMETER_ERROR_CODE,
-      "无效的参数: weCrewType"
+      "Invalid parameter: weCrewType"
     );
   }
 
@@ -296,7 +411,7 @@ function validateIntegerInRange(
   if (!Number.isInteger(value) || value < min || value > max) {
     throw createSdkError(
       INVALID_PARAMETER_ERROR_CODE,
-      `无效的参数: ${fieldName}`
+      `Invalid parameter: ${fieldName}`
     );
   }
 
@@ -325,13 +440,13 @@ function buildHttpError(
   if (isDigitalTwinApiResponse<unknown>(responseBody) && typeof responseBody.code === "number") {
     return createSdkError(
       responseBody.code,
-      getErrorMessage(responseBody, `服务端错误: ${status} ${statusText}`)
+      getErrorMessage(responseBody, `Server error: ${status} ${statusText}`)
     );
   }
 
   return createSdkError(
     SERVER_ERROR_CODE,
-    `服务端错误: ${status} ${statusText}`
+    `Server error: ${status} ${statusText}`
   );
 }
 
