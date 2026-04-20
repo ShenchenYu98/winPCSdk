@@ -317,9 +317,11 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
       "desc": "我是xxx",
       "partnerAccount": "x00_1",
       "bizRobotId": "",
+      "bizRobotTag": "uniassistant",
       "bizRobotName": "员工助手",
       "bizRobotNameEn": "employee_assistant",
       "ownerWelinkId": "",
+      "ownerW3Account": "s00123456",
       "ownerName": "",
       "ownerNameEn": "",
       "ownerDeptName": "",
@@ -332,7 +334,8 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
       "creatorName": "",
       "creatorNameEn": "",
       "weCodeUrl": "https://xxx",
-      "creatorWorkId": ""
+      "creatorWorkId": "",
+      "creatorW3Account": "s00123478"
     },
     {
       "name": "员工助手",
@@ -340,9 +343,11 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
       "desc": "我是xxx",
       "partnerAccount": "x00_1",
       "bizRobotId": "",
+      "bizRobotTag": "uniassistant",
       "bizRobotName": "员工助手",
       "bizRobotNameEn": "employee_assistant",
       "ownerWelinkId": "",
+      "ownerW3Account": "s00123456",
       "ownerName": "",
       "ownerNameEn": "",
       "ownerDeptName": "",
@@ -355,7 +360,8 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
       "creatorName": "",
       "creatorNameEn": "",
       "weCodeUrl": "https://xxx",
-      "creatorWorkId": ""
+      "creatorWorkId": "",
+      "creatorW3Account": "s00123478"
     }
   ]
 }
@@ -384,9 +390,11 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
             "desc": "我是xxx",
             "partnerAccount": "x00_1",
             "bizRobotId": "",
+            "bizRobotTag": "uniassistant",
             "bizRobotName": "员工助手",
             "bizRobotNameEn": "employee_assistant",
             "ownerWelinkId": "",
+            "ownerW3Account": "s00123456",
             "ownerName": "",
             "ownerNameEn": "",
             "ownerDeptName": "",
@@ -399,7 +407,8 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
             "creatorName": "",
             "creatorNameEn": "",
             "weCodeUrl": "https://xxx",
-            "creatorWorkId": ""
+            "creatorWorkId": "",
+            "creatorW3Account": "s00123478"
         },
         {
           "name": "员工助手",
@@ -407,9 +416,11 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
           "desc": "我是xxx",
           "partnerAccount": "x00_1",
           "bizRobotId": "",
+          "bizRobotTag": "uniassistant",
           "bizRobotName": "员工助手",
           "bizRobotNameEn": "employee_assistant",
           "ownerWelinkId": "",
+          "ownerW3Account": "s00123456",
           "ownerName": "",
           "ownerNameEn": "",
           "ownerDeptName": "",
@@ -422,7 +433,8 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
           "creatorName": "",
           "creatorNameEn": "",
           "weCodeUrl": "https://xxx",
-          "creatorWorkId": ""
+          "creatorWorkId": "",
+          "creatorW3Account": "s00123478"
         }
         ],
         "message": "success",
@@ -467,9 +479,11 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
 | desc            | string | 助理简介                |
 | partnerAccount  | string | 助理ID                  |
 | bizRobotId      | string | agent对应的业务机器人id |
+| bizRobotTag      | string | agent对应的业务机器人tag |
 | bizRobotName      | string | agent对应的业务机器人名称 |
 | bizRobotNameEn      | string | agent对应的业务机器人英文名 |
 | ownerWelinkId   | string | 助理责任人ID            |
+| ownerW3Account       | string | 助理责任人W3账号          |
 | ownerName       | string | 助理责任人名称          |
 | ownerNameEn     | string | 助理责任人英文名称      |
 | ownerDeptName   | string | 助理责任部门中文名      |
@@ -483,3 +497,4 @@ getWeAgentDetails(params: queryWeAgentParams): Promise<WeAgentDetailsArray>
 | creatorNameEn   | string | 创建者英文名称          |
 | weCodeUrl       | string | We码地址                |
 | creatorWorkId   | string | creatorWorkId         |
+| creatorW3Account   | string | agent创建人W3账号         |

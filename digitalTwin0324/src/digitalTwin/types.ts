@@ -61,14 +61,17 @@ export interface WeAgentDetails {
   creatorNameEn: string,
   creatorWorkId: string,
   ownerWelinkId: string,
+  ownerW3Account: string,
   ownerName: string,
   ownerNameEn: string,
   ownerDeptName: string,
   ownerDeptNameEn: string,
   bizRobotId: string,
+  bizRobotTag: string,
   bizRobotName: string,
   bizRobotNameEn: string,
-  weCodeUrl: string
+  weCodeUrl: string,
+  creatorW3Account: string
 }
 
 export type WeAgentDetailsArray = WeAgentDetails[]
