@@ -575,6 +575,129 @@ deleteWeAgent(params: deleteParams): Promise<deleteResult>
       }
       ```
 
+## 7. 查询二维码信息接口
+
+### 接口说明
+
+根据二维码唯一标识查询二维码相关信息。
+
+### 接口名
+
+```typescript
+queryQrcodeInfo(params: QueryQrcodeInfoParams): Promise<QrcodeInfo>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `qrcode` | `string` | 是 | 二维码唯一标识 |
+
+### 入参示例
+
+```json
+{
+  "qrcode": "qr_001"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `qrcode` | `string` | 二维码唯一标识 |
+| `weUrl` | `string` | We 侧地址 |
+| `pcUrl` | `string` | PC 侧地址 |
+| `expireTime` | `string` | 过期时间戳 |
+| `status` | `number` | 二维码状态 |
+| `expired` | `boolean` | 过期状态 |
+
+### 出参示例
+
+```json
+{
+  "qrcode": "qr_001",
+  "weUrl": "welink://xxx",
+  "pcUrl": "https://xxx",
+  "expireTime": "1713686400000",
+  "status": 1,
+  "expired": false
+}
+```
+
+### 实现方法
+
+1. SDK 调用服务端 REST API：`GET /nologin/we-crew/im-register/qrcode/{qrcode}`。
+2. 服务端响应结构为：
+   - `code: string`
+   - `message: string`
+   - `data: object`
+3. SDK 对外不透出服务端包装字段，直接透传 `data` 中的以下字段作为接口返回：
+   - `qrcode`
+   - `weUrl`
+   - `pcUrl`
+   - `expireTime`
+   - `status`
+   - `expired`
+
+---
+
+## 8. 更新二维码信息接口
+
+### 接口说明
+
+根据二维码唯一标识更新二维码信息。
+
+### 接口名
+
+```typescript
+updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `qrcode` | `string` | 是 | 二维码唯一标识 |
+| `ak` | `string` | 否 | Access Key |
+| `status` | `number` | 是 | 二维码状态 |
+
+### 入参示例
+
+```json
+{
+  "qrcode": "qr_001",
+  "ak": "ak_xxx",
+  "status": 2
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `status` | `string` | 当服务端返回 `code=200` 时固定返回 `success` |
+
+### 出参示例
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 实现方法
+
+1. SDK 调用服务端 REST API：`PUT /v4-1/we-crew/im-register/qrcode`。
+2. SDK 透传入参 `qrcode`、`ak`、`status`。
+3. 服务端响应结构为：
+   - `code: string`
+   - `message: string`
+4. SDK 根据服务端 `code` 判断结果：
+   - 当 `code` 为 `200` 时，返回 `{ status: "success" }`。
+
+---
+
 ## 数据类型定义
 
 ### AgentType

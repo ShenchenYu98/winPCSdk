@@ -3,6 +3,8 @@ export {
   createDigitalTwin,
   deleteWeAgent,
   getAgentType,
+  queryQrcodeInfo,
+  updateQrcodeInfo,
   updateWeAgent,
   getWeAgentList,
   getWeAgentDetails

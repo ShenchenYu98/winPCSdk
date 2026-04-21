@@ -6,7 +6,11 @@ import {
   deleteParams,
   deleteResult,
   pageParams,
+  QrcodeInfo,
   queryWeAgentParams,
+  QueryQrcodeInfoParams,
+  UpdateQrcodeInfoParams,
+  UpdateQrcodeInfoResult,
   updateParams,
   updateResult,
   WeAgent,
@@ -21,6 +25,8 @@ const GET_WE_AGENT_LIST_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/list`;
 const GET_WE_AGENT_DETAILS_URL = `${DIGITAL_TWIN_BASE_URL}/v1/robot-partners`;
 const UPDATE_WE_AGENT_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew`;
 const DELETE_WE_AGENT_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew`;
+const QUERY_QRCODE_INFO_URL = `${DIGITAL_TWIN_BASE_URL}/nologin/we-crew/im-register/qrcode`;
+const UPDATE_QRCODE_INFO_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/im-register/qrcode`;
 
 const INVALID_PARAMETER_ERROR_CODE = 1000;
 const NETWORK_ERROR_CODE = 6000;
@@ -283,6 +289,95 @@ export const updateWeAgent = async (
   return getSuccessMessage(responseBody.message);
 };
 
+export const queryQrcodeInfo = async (
+  params: QueryQrcodeInfoParams
+): Promise<QrcodeInfo> => {
+  const qrcode = validateRequiredString(params.qrcode, "qrcode");
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${QUERY_QRCODE_INFO_URL}/${encodeURIComponent(qrcode)}`, {
+      method: "GET",
+      credentials: "include"
+    });
+  } catch {
+    throw createSdkError(NETWORK_ERROR_CODE, "Network error");
+  }
+
+  const responseBody = await parseResponseBody(response);
+
+  if (!response.ok) {
+    throw buildHttpError(response.status, response.statusText, responseBody);
+  }
+
+  if (!isDigitalTwinApiResponse<unknown>(responseBody)) {
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response format");
+  }
+
+  if (responseBody.code !== 200) {
+    throw createSdkError(
+      typeof responseBody.code === "number" ? responseBody.code : SERVER_ERROR_CODE,
+      getErrorMessage(responseBody, "Server error")
+    );
+  }
+
+  return responseBody.data as QrcodeInfo;
+};
+
+export const updateQrcodeInfo = async (
+  params: UpdateQrcodeInfoParams
+): Promise<UpdateQrcodeInfoResult> => {
+  const qrcode = validateRequiredString(params.qrcode, "qrcode");
+  const ak = normalizeOptionalString(params.ak);
+  const status = validateRequiredNumber(params.status, "status");
+
+  const payload: UpdateQrcodeInfoParams = {
+    qrcode,
+    status
+  };
+
+  if (ak) {
+    payload.ak = ak;
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(UPDATE_QRCODE_INFO_URL, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: "include",
+      body: JSON.stringify(payload)
+    });
+  } catch {
+    throw createSdkError(NETWORK_ERROR_CODE, "Network error");
+  }
+
+  const responseBody = await parseResponseBody(response);
+
+  if (!response.ok) {
+    throw buildHttpError(response.status, response.statusText, responseBody);
+  }
+
+  if (!isDigitalTwinApiResponse<unknown>(responseBody)) {
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response format");
+  }
+
+  if (responseBody.code !== 200) {
+    throw createSdkError(
+      typeof responseBody.code === "number" ? responseBody.code : SERVER_ERROR_CODE,
+      getErrorMessage(responseBody, "Server error")
+    );
+  }
+
+  return {
+    status: "success"
+  };
+};
+
 export const deleteWeAgent = async (
   params: deleteParams
 ): Promise<deleteResult> => {
@@ -400,6 +495,17 @@ function validatePageSize(value: number): number {
 
 function validatePageNumber(value: number): number {
   return validateIntegerInRange(value, "pageNumber", 1, 1000);
+}
+
+function validateRequiredNumber(value: number, fieldName: string): number {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    throw createSdkError(
+      INVALID_PARAMETER_ERROR_CODE,
+      `Invalid parameter: ${fieldName}`
+    );
+  }
+
+  return value;
 }
 
 function validateIntegerInRange(

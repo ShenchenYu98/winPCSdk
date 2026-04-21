@@ -47,12 +47,31 @@ export interface queryWeAgentParams {
   partnerAccounts: string[]
 }
 
+export interface QueryQrcodeInfoParams {
+  qrcode: string
+}
+
+export interface QrcodeInfo {
+  qrcode: string,
+  weUrl: string,
+  pcUrl: string,
+  expireTime: string,
+  status: number,
+  expired: boolean
+}
+
 export interface updateParams {
   partnerAccount?: string,
   robotId?: string,
   name: string,
   icon: string,
   description: string
+}
+
+export interface UpdateQrcodeInfoParams {
+  qrcode: string,
+  ak?: string,
+  status: number
 }
 
 export interface deleteParams {
@@ -90,3 +109,6 @@ export interface WeAgentDetails {
 export type WeAgentDetailsArray = WeAgentDetails[]
 export type updateResult = string
 export type deleteResult = string
+export interface UpdateQrcodeInfoResult {
+  status: string
+}
