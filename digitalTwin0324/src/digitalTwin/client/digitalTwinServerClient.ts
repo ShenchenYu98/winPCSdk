@@ -5,6 +5,7 @@ import {
   CreateResult,
   deleteParams,
   deleteResult,
+  grayList,
   pageParams,
   QrcodeInfo,
   queryWeAgentParams,
@@ -27,6 +28,7 @@ const UPDATE_WE_AGENT_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew`;
 const DELETE_WE_AGENT_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew`;
 const QUERY_QRCODE_INFO_URL = `${DIGITAL_TWIN_BASE_URL}/nologin/we-crew/im-register/qrcode`;
 const UPDATE_QRCODE_INFO_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/im-register/qrcode`;
+const HAS_GRAY_URL = `${DIGITAL_TWIN_BASE_URL}/strategy/v1/has-gray`;
 
 const INVALID_PARAMETER_ERROR_CODE = 1000;
 const NETWORK_ERROR_CODE = 6000;
@@ -427,6 +429,40 @@ export const deleteWeAgent = async (
   }
 
   return getSuccessMessage(responseBody.message);
+};
+
+export const hasGray = async (): Promise<grayList> => {
+  let response: Response;
+
+  try {
+    response = await fetch(HAS_GRAY_URL, {
+      method: "GET",
+      credentials: "include"
+    });
+  } catch {
+    throw createSdkError(NETWORK_ERROR_CODE, "Network error");
+  }
+
+  const responseBody = await parseResponseBody(response);
+
+  if (!response.ok) {
+    throw buildHttpError(response.status, response.statusText, responseBody);
+  }
+
+  if (!isDigitalTwinApiResponse<unknown>(responseBody)) {
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response format");
+  }
+
+  if (responseBody.code !== 200) {
+    throw createSdkError(
+      typeof responseBody.code === "number" ? responseBody.code : SERVER_ERROR_CODE,
+      getErrorMessage(responseBody, "Server error")
+    );
+  }
+
+  return {
+    grayList: (responseBody.data ?? {}) as Record<string, unknown>
+  };
 };
 
 function createSdkError(errorCode: number, errorMessage: string): DigitalTwinSdkError {

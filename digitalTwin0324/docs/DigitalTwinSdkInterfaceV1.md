@@ -698,6 +698,59 @@ updateQrcodeInfo(params: UpdateQrcodeInfoParams): Promise<UpdateQrcodeInfoResult
 
 ---
 
+## 9. 获取助理创建权限
+
+### 接口说明
+
+判读当前用户是否拥有创建助理的权限
+
+### 接口名
+
+```typescript
+hasGray(): Promise<grayList>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| 无 | 无 | 无 | 无 |
+
+### 入参示例
+
+无
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `grayList` | `object` | 灰度名单 |
+
+### 出参示例
+
+```json
+{
+  "grayList": {
+    "testGray": {
+      "pcDomain": "baidu.com",
+      "enable": 1
+    }
+  }
+}
+```
+
+### 实现方法
+
+1. SDK 调用服务端 REST API：`GET /strategy/v1/has-gray`。
+2. 服务端响应结构为：
+   - `code: number`
+   - `message: string`
+   - `data: object`
+3. SDK 根据服务端 `code` 判断结果：
+   - 当 `code` 为 `200` 时，返回 `{ grayList: data  }`。
+
+---
+
 ## 数据类型定义
 
 ### AgentType

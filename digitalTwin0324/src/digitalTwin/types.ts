@@ -112,3 +112,7 @@ export type deleteResult = string
 export interface UpdateQrcodeInfoResult {
   status: string
 }
+
+export interface grayList {
+  grayList: Record<string, unknown>
+}
