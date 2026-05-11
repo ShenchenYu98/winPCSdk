@@ -4,6 +4,7 @@ export {
   deleteWeAgent,
   getAgentType,
   hasGray,
+  queryAssistantGraySingle,
   queryQrcodeInfo,
   updateQrcodeInfo,
   updateWeAgent,

@@ -8,6 +8,8 @@ import {
   grayList,
   pageParams,
   QrcodeInfo,
+  QueryAssistantGraySingleParams,
+  QueryAssistantGraySingleResult,
   queryWeAgentParams,
   QueryQrcodeInfoParams,
   UpdateQrcodeInfoParams,
@@ -29,10 +31,21 @@ const DELETE_WE_AGENT_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew`;
 const QUERY_QRCODE_INFO_URL = `${DIGITAL_TWIN_BASE_URL}/nologin/we-crew/im-register/qrcode`;
 const UPDATE_QRCODE_INFO_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/im-register/qrcode`;
 const HAS_GRAY_URL = `${DIGITAL_TWIN_BASE_URL}/strategy/v1/has-gray`;
+const QUERY_ASSISTANT_GRAY_SINGLE_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/robot-partners/im-chat/gray-single`;
 
 const INVALID_PARAMETER_ERROR_CODE = 1000;
 const NETWORK_ERROR_CODE = 6000;
 const SERVER_ERROR_CODE = 7000;
+const SAVE_DB_METHOD = "method://agentSkills/saveDb";
+const ASSISTANT_GRAY_SINGLE_CACHE_KEY_PREFIX = "assistant_gray_single_cache_";
+
+declare global {
+  interface Window {
+    Pedestal: {
+      callMethod(method: string, payload: unknown): Promise<unknown>;
+    };
+  }
+}
 
 interface DigitalTwinSdkError {
   errorCode: number;
@@ -465,6 +478,29 @@ export const hasGray = async (): Promise<grayList> => {
   };
 };
 
+export const queryAssistantGraySingle = async (
+  params: QueryAssistantGraySingleParams
+): Promise<QueryAssistantGraySingleResult> => {
+  const partnerAccount = validateRequiredString(params.partnerAccount, "partnerAccount");
+  const cacheKey = getAssistantGraySingleCacheKey(partnerAccount);
+  const cachedValue = await queryAssistantGraySingleCache(cacheKey);
+
+  if (typeof cachedValue === "boolean") {
+    void refreshAssistantGraySingleCache(partnerAccount, cacheKey);
+
+    return {
+      data: cachedValue
+    };
+  }
+
+  const data = await requestAssistantGraySingle(partnerAccount);
+  await saveAssistantGraySingleCache(cacheKey, data);
+
+  return {
+    data
+  };
+};
+
 function createSdkError(errorCode: number, errorMessage: string): DigitalTwinSdkError {
   return {
     errorCode,
@@ -613,6 +649,127 @@ function getSuccessMessage(message?: string): string {
   }
 
   return "success";
+}
+
+async function requestAssistantGraySingle(partnerAccount: string): Promise<boolean> {
+  const query = new URLSearchParams({
+    welinkId: partnerAccount
+  });
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${QUERY_ASSISTANT_GRAY_SINGLE_URL}?${query.toString()}`, {
+      method: "GET",
+      credentials: "include"
+    });
+  } catch {
+    throw createSdkError(NETWORK_ERROR_CODE, "Network error");
+  }
+
+  const responseBody = await parseResponseBody(response);
+
+  if (!response.ok) {
+    throw buildHttpError(response.status, response.statusText, responseBody);
+  }
+
+  if (!isDigitalTwinApiResponse<unknown>(responseBody)) {
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response format");
+  }
+
+  if (responseBody.code !== 200) {
+    throw createSdkError(
+      typeof responseBody.code === "number" ? responseBody.code : SERVER_ERROR_CODE,
+      getErrorMessage(responseBody, "Server error")
+    );
+  }
+
+  if (typeof responseBody.data !== "boolean") {
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response data");
+  }
+
+  return responseBody.data;
+}
+
+async function refreshAssistantGraySingleCache(
+  partnerAccount: string,
+  cacheKey: string
+): Promise<void> {
+  try {
+    const data = await requestAssistantGraySingle(partnerAccount);
+    await saveAssistantGraySingleCache(cacheKey, data);
+  } catch (error) {
+    console.warn("Failed to refresh assistant gray single cache", error);
+  }
+}
+
+async function queryAssistantGraySingleCache(cacheKey: string): Promise<boolean | undefined> {
+  try {
+    const cachedValue = await window.Pedestal.callMethod(SAVE_DB_METHOD, {
+      type: "query",
+      params: {
+        key: cacheKey
+      }
+    });
+
+    return parseAssistantGraySingleCacheValue(cachedValue);
+  } catch {
+    return undefined;
+  }
+}
+
+async function saveAssistantGraySingleCache(cacheKey: string, data: boolean): Promise<void> {
+  try {
+    await window.Pedestal.callMethod(SAVE_DB_METHOD, {
+      type: "add",
+      params: {
+        key: cacheKey,
+        value: JSON.stringify(data)
+      }
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+function getAssistantGraySingleCacheKey(partnerAccount: string): string {
+  return `${ASSISTANT_GRAY_SINGLE_CACHE_KEY_PREFIX}${partnerAccount}`;
+}
+
+function parseAssistantGraySingleCacheValue(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value !== "string" || !value.trim()) {
+    return undefined;
+  }
+
+  try {
+    const parsedValue = JSON.parse(value) as unknown;
+
+    if (typeof parsedValue === "boolean") {
+      return parsedValue;
+    }
+
+    if (parsedValue === "true") {
+      return true;
+    }
+
+    if (parsedValue === "false") {
+      return false;
+    }
+  } catch {
+    if (value.trim() === "true") {
+      return true;
+    }
+
+    if (value.trim() === "false") {
+      return false;
+    }
+  }
+
+  return undefined;
 }
 
 function isDigitalTwinApiResponse<T>(value: unknown): value is DigitalTwinApiResponse<T> {

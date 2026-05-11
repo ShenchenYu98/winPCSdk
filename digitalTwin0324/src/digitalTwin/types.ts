@@ -51,6 +51,14 @@ export interface QueryQrcodeInfoParams {
   qrcode: string
 }
 
+export interface QueryAssistantGraySingleParams {
+  partnerAccount: string
+}
+
+export interface QueryAssistantGraySingleResult {
+  data: boolean
+}
+
 export interface QrcodeInfo {
   qrcode: string,
   weUrl: string,

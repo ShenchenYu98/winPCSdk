@@ -751,6 +751,77 @@ hasGray(): Promise<grayList>
 
 ---
 
+## 10. 查询助理单人灰度接口
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+根据 `partnerAccount` 查询当前用户是否命中助理单人灰度。
+
+该接口需要做本地缓存：
+
+- 若本地已存在该 `partnerAccount` 的缓存结果，则优先返回缓存
+- 返回缓存后，SDK 异步调用服务端接口刷新缓存
+- 若本地不存在该 `partnerAccount` 的缓存结果，则调用服务端接口获取并写入缓存
+
+### 接口名
+
+```typescript
+queryAssistantGraySingle(params: QueryAssistantGraySingleParams): Promise<QueryAssistantGraySingleResult>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `partnerAccount` | `string` | 是 | 助理Id |
+
+### 入参示例
+
+```json
+{
+  "partnerAccount": "x12345678"
+}
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `data` | `boolean` | 业务助手是否在灰度名单内 |
+
+### 出参示例
+
+```json
+{
+  "data": true
+}
+```
+
+### 实现方法
+
+1. SDK 在本地缓存中读取固定缓存 key `assistant_gray_single_cache_{partnerAccount}`
+   - 缓存获取
+   const cachedValue = await window.Pedestal.callMethod('method://agentSkills/saveDb',{type:'query',params:{key:`assistant_gray_single_cache_{partnerAccount}`}});
+2. 若读取到对应的缓存值，则 SDK 立即返回 `{ data: cachedValue }`。
+3. 在返回缓存后，SDK 异步调用服务端 REST API：`GET /v4-1/robot-partners/im-chat/gray-single?welinkId={partnerAccount}`。
+4. 服务端响应结构为：
+   - `data: boolean`
+   - `message: string`
+   - `code: number`
+   - `error: string`
+5. 当异步刷新请求返回 `code = 200` 时，SDK 使用最新 `data` 覆盖更新对应key缓存的数据。
+    - 缓存写入
+   await window.Pedestal.callMethod('method://agentSkills/saveDb',{type:'add',params:{key:`assistant_gray_single_cache_{partnerAccount}`,value:JSON.stringfy(`data`)}});
+6. 若未读取到缓存，则 SDK 同步调用服务端 REST API：`GET /v4-1/robot-partners/im-chat/gray-single?welinkId={partnerAccount}`。
+7. 当同步请求返回 `code = 200` 时，SDK 将服务端返回的 `data` 写入`assistant_gray_single_cache_{partnerAccount}`key对应的缓存数据。
+8. 当服务端返回非 `200` 时，SDK 抛出异常，并透传服务端 `code` 与 `message`。
+9.  当缓存命中后的异步刷新失败时，不影响当前已返回的缓存结果；SDK 不删除旧缓存，可记录日志用于排查。
+
+
 ## 数据类型定义
 
 ### AgentType
