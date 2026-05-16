@@ -49,7 +49,7 @@ IM 客户端调用
 ### 接口名
 
 ```typescript
-createSession(params: CreateNewSessionParams): Promise<Session>
+createSession(params: CreateNewSessionParams): Promise<SkillSession>
 ```
 
 ### 入参
@@ -1238,7 +1238,10 @@ try {
   const session = await createSession({
     ak: "ak_xxxxxxxx",
     title: "帮我创建一个React项目",
-    imGroupId: "group_abc123"
+    bussinessDomain: "miniapp",
+    bussinessType: "direct",
+    assistantAccount: "x00_1",
+    bussinessId: "x00123456"
   });
 
   // 然后发送首条消息
@@ -1434,7 +1437,7 @@ IM 客户端调用
 ### 接口名
 
 ```typescript
-createNewSession(params: CreateNewSessionParams): Promise<Session>
+createNewSession(params: CreateNewSessionParams): Promise<SkillSession>
 ```
 
 ### 入参
@@ -1762,19 +1765,14 @@ try {
 | userId | string | 用户 ID |
 | ak | string \| null | Access Key，未关联 Agent 时为 `null` |
 | title | string \| null | 会话标题，未设置时为 `null` |
-| imGroupId | string \| null | IM 群组 ID，未设置时为 `null` |
+| bussinessDomain | string \| null | 会话关联场域 |
+| bussinessType | string \| null | 会话类型 |
+| bussinessId | string \| null | 单聊场景为对话所属人Id，群里则为群Id |
+| assistantAccount | string \| null | 助理Id |
 | status | string | 会话状态：`ACTIVE` / `IDLE` / `CLOSED` |
 | toolSessionId | string \| null | OpenCode Session ID |
 | createdAt | string | 创建时间，ISO-8601 |
 | updatedAt | string | 更新时间，ISO-8601 |
-
-### CreateSessionParams
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| ak | String | 否 | Agent Plugin 对应的 Access Key |
-| title | String | 否 | 会话标题 |
-| imGroupId | String | 否 | 关联的 IM 群组 ID |
 
 ### CreateNewSessionParams
 
@@ -2178,24 +2176,6 @@ try {
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | success | boolean | 发送是否成功（服务端字段） |
-
-### Session
-```typescript
-interface Session {
-  welinkSessionId: string;       // welinkSessionId（Snowflake ID，字符串化）
-  userId?: string;               // 会话所有者
-  ak?: string;                   // Agent Key
-  title: string;                 // 会话标题
-  bussinessDomain: string;       // 会话关联场域
-  bussinessType: string;         // 会话类型
-  bussinessId: string;           // 对话所属id，单聊为用户Id，群聊为群Id
-  assistantAccount: string;      // 分身账号id
-  status: 'ACTIVE' | 'IDLE' | 'CLOSED';
-  toolSessionId?: string;        // OpenCode 侧会话 ID（可能未就绪）
-  createdAt: string;             // ISO 时间戳
-  updatedAt: string;
-}
-```
 
 ### GetSessionMessageHistoryParams
 

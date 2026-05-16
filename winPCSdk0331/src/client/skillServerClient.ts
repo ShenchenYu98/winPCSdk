@@ -6,11 +6,11 @@ import type {
   PageResult,
   ReplyPermissionParams,
   ReplyPermissionResult,
-  Session,
   SendMessageParams,
   SendMessageResult,
   SendMessageToIMResult,
   SessionMessage,
+  SkillSession,
   StopSkillResult
 } from "../types";
 
@@ -32,7 +32,7 @@ interface Layer1Response<T> {
 export class SkillServerClient {
   constructor(private readonly baseUrl: string) {}
 
-  async getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<Session>> {
+  async getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillSession>> {
     const query = new URLSearchParams({
       page: String(params.page),
       size: String(params.size)
@@ -58,13 +58,13 @@ export class SkillServerClient {
       query.set("businessSessionDomain", params.businessSessionDomain.trim());
     }
 
-    return this.request<PageResult<Session>>(`/api/skill/sessions?${query.toString()}`);
+    return this.request<PageResult<SkillSession>>(`/api/skill/sessions?${query.toString()}`);
   }
 
-  async createNewSession(params: CreateNewSessionParams): Promise<Session> {
+  async createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
     this.validateRequired(params.bussinessId, "bussinessId");
 
-    return this.request<Session>("/api/skill/sessions", {
+    return this.request<SkillSession>("/api/skill/sessions", {
       method: "POST",
       body: JSON.stringify(this.normalizeCreateNewSessionPayload(params))
     });
@@ -151,7 +151,7 @@ export class SkillServerClient {
     );
   }
 
-  async createSession(params: CreateNewSessionParams): Promise<Session> {
+  async createSession(params: CreateNewSessionParams): Promise<SkillSession> {
     const sessions = await this.listReusableSessions(params);
     const latestReusableSession = sessions.content
       .filter((session) => {
@@ -167,7 +167,7 @@ export class SkillServerClient {
     return this.createNewSession(params);
   }
 
-  private async listReusableSessions(params: CreateNewSessionParams): Promise<PageResult<Session>> {
+  private async listReusableSessions(params: CreateNewSessionParams): Promise<PageResult<SkillSession>> {
     const query = new URLSearchParams({ page: "0", size: "50" });
 
     if (params.ak?.trim()) {
@@ -186,7 +186,7 @@ export class SkillServerClient {
       query.set("businessSessionDomain", params.bussinessDomain.trim());
     }
 
-    return this.request<PageResult<Session>>(`/api/skill/sessions?${query.toString()}`);
+    return this.request<PageResult<SkillSession>>(`/api/skill/sessions?${query.toString()}`);
   }
 
   private normalizeCreateNewSessionPayload(

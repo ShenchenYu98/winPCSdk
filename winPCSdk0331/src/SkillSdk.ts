@@ -20,13 +20,13 @@ import type {
   RegisterSessionListenerResult,
   ReplyPermissionParams,
   ReplyPermissionResult,
-  Session,
   SendMessageParams,
   SendMessageResult,
   SendMessageToIMParams,
   SendMessageToIMResult,
   SessionMessage,
   SkillSdkApi,
+  SkillSession,
   StopSkillParams,
   StopSkillResult,
   UnregisterSessionListenerParams,
@@ -53,12 +53,12 @@ export class SkillSdk implements SkillSdkApi {
     );
   }
 
-  async createSession(params: CreateNewSessionParams): Promise<Session> {
+  async createSession(params: CreateNewSessionParams): Promise<SkillSession> {
     await this.connectionManager.ensureConnected();
     return this.orchestrator.createSession(params);
   }
 
-  async createNewSession(params: CreateNewSessionParams): Promise<Session> {
+  async createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
     await this.connectionManager.ensureConnected();
     return this.orchestrator.createNewSession(params);
   }
@@ -110,7 +110,7 @@ export class SkillSdk implements SkillSdkApi {
 
   async getHistorySessionsList(
     params: HistorySessionsParams
-  ): Promise<PageResult<Session>> {
+  ): Promise<PageResult<SkillSession>> {
     await this.connectionManager.ensureConnected();
     return this.orchestrator.getHistorySessionsList(params);
   }
