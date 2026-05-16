@@ -2,7 +2,6 @@ import { createSdkError } from "../errors";
 import { SkillServerClient } from "../client/skillServerClient";
 import type {
   CreateNewSessionParams,
-  CreateSessionParams,
   CursorResult,
   GetSessionMessageParams,
   GetSessionMessageHistoryParams,
@@ -16,8 +15,7 @@ import type {
   SendMessageResult,
   SendMessageToIMParams,
   SendMessageToIMResult,
-  SessionMessage,
-  SkillSession
+  SessionMessage
 } from "../types";
 import { MessageCacheStore } from "./messageCacheStore";
 
@@ -27,14 +25,13 @@ export class SessionOrchestrator {
     private readonly cacheStore: MessageCacheStore
   ) {}
 
-  async createSession(params: CreateSessionParams): Promise<SkillSession> {
-    return this.client.createOrReuseSession(params);
+  async createSession(params: CreateNewSessionParams): Promise<Session> {
+    validateRequired(params.bussinessId, "bussinessId");
+    return this.client.createSession(params);
   }
 
   async createNewSession(params: CreateNewSessionParams): Promise<Session> {
-    validateRequired(params.ak, "ak");
     validateRequired(params.bussinessId, "bussinessId");
-    validateRequired(params.assistantAccount, "assistantAccount");
 
     return this.client.createNewSession({
       ...params,

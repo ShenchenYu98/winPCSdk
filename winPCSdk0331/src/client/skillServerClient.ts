@@ -1,7 +1,6 @@
 import { createSdkError } from "../errors";
 import type {
   CreateNewSessionParams,
-  CreateSessionParams,
   CursorResult,
   HistorySessionsParams,
   PageResult,
@@ -12,23 +11,16 @@ import type {
   SendMessageResult,
   SendMessageToIMResult,
   SessionMessage,
-  SkillSession,
   StopSkillResult
 } from "../types";
 
-interface CreateSessionPayload {
-  ak?: string;
-  title?: string;
-  imGroupId?: string;
-}
-
 interface CreateNewSessionPayload {
-  ak: string;
+  ak?: string;
   title?: string;
   bussinessDomain: string;
   bussinessId: string;
   bussinessType: string;
-  assistantAccount: string;
+  assistantAccount?: string;
 }
 
 interface Layer1Response<T> {
@@ -39,18 +31,6 @@ interface Layer1Response<T> {
 
 export class SkillServerClient {
   constructor(private readonly baseUrl: string) {}
-
-  async listActiveSessions(imGroupId: string, ak?: string): Promise<PageResult<SkillSession>> {
-    this.validateRequired(imGroupId, "imGroupId");
-
-    const query = new URLSearchParams({ imGroupId, status: "ACTIVE" });
-
-    if (ak?.trim()) {
-      query.set("ak", ak);
-    }
-
-    return this.request<PageResult<SkillSession>>(`/api/skill/sessions?${query.toString()}`);
-  }
 
   async getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<Session>> {
     const query = new URLSearchParams({
@@ -81,14 +61,9 @@ export class SkillServerClient {
     return this.request<PageResult<Session>>(`/api/skill/sessions?${query.toString()}`);
   }
 
-  async createSession(payload: CreateSessionPayload): Promise<SkillSession> {
-    return this.request<SkillSession>("/api/skill/sessions", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-  }
-
   async createNewSession(params: CreateNewSessionParams): Promise<Session> {
+    this.validateRequired(params.bussinessId, "bussinessId");
+
     return this.request<Session>("/api/skill/sessions", {
       method: "POST",
       body: JSON.stringify(this.normalizeCreateNewSessionPayload(params))
@@ -176,26 +151,52 @@ export class SkillServerClient {
     );
   }
 
-  async createOrReuseSession(params: CreateSessionParams): Promise<SkillSession> {
-    this.validateRequired(params.imGroupId, "imGroupId");
+  async createSession(params: CreateNewSessionParams): Promise<Session> {
+    const sessions = await this.listReusableSessions(params);
+    const latestReusableSession = sessions.content
+      .filter((session) => {
+        const status = session.status.toLowerCase();
+        return status !== "close" && status !== "closed";
+      })
+      .sort((left, right) => this.toTimestamp(right.updatedAt) - this.toTimestamp(left.updatedAt))[0];
 
-    const sessions = await this.listActiveSessions(params.imGroupId, params.ak);
-    const latestActiveSession = [...sessions.content].sort((left, right) =>
-      right.updatedAt.localeCompare(left.updatedAt)
-    )[0];
-
-    if (latestActiveSession) {
-      return latestActiveSession;
+    if (latestReusableSession) {
+      return latestReusableSession;
     }
 
-    return this.createSession({
-      ...this.normalizeCreateSessionPayload(params),
-      imGroupId: params.imGroupId.trim()
-    });
+    return this.createNewSession(params);
   }
 
-  private normalizeCreateSessionPayload(payload: CreateSessionParams): CreateSessionPayload {
-    const normalized: CreateSessionPayload = {};
+  private async listReusableSessions(params: CreateNewSessionParams): Promise<PageResult<Session>> {
+    const query = new URLSearchParams({ page: "0", size: "50" });
+
+    if (params.ak?.trim()) {
+      query.set("ak", params.ak.trim());
+    }
+
+    if (params.bussinessId?.trim()) {
+      query.set("bussinessId", params.bussinessId.trim());
+    }
+
+    if (params.assistantAccount?.trim()) {
+      query.set("assistantAccount", params.assistantAccount.trim());
+    }
+
+    if (params.bussinessDomain?.trim()) {
+      query.set("businessSessionDomain", params.bussinessDomain.trim());
+    }
+
+    return this.request<PageResult<Session>>(`/api/skill/sessions?${query.toString()}`);
+  }
+
+  private normalizeCreateNewSessionPayload(
+    payload: CreateNewSessionParams
+  ): CreateNewSessionPayload {
+    const normalized: CreateNewSessionPayload = {
+      bussinessDomain: payload.bussinessDomain?.trim() || "miniapp",
+      bussinessId: payload.bussinessId.trim(),
+      bussinessType: payload.bussinessType?.trim() || "direct"
+    };
 
     if (payload.ak?.trim()) {
       normalized.ak = payload.ak.trim();
@@ -205,29 +206,16 @@ export class SkillServerClient {
       normalized.title = payload.title.trim();
     }
 
-    if (payload.imGroupId?.trim()) {
-      normalized.imGroupId = payload.imGroupId.trim();
+    if (payload.assistantAccount?.trim()) {
+      normalized.assistantAccount = payload.assistantAccount.trim();
     }
 
     return normalized;
   }
 
-  private normalizeCreateNewSessionPayload(
-    payload: CreateNewSessionParams
-  ): CreateNewSessionPayload {
-    const normalized: CreateNewSessionPayload = {
-      ak: payload.ak.trim(),
-      bussinessDomain: payload.bussinessDomain?.trim() || "miniapp",
-      bussinessId: payload.bussinessId.trim(),
-      bussinessType: payload.bussinessType?.trim() || "direct",
-      assistantAccount: payload.assistantAccount.trim()
-    };
-
-    if (payload.title?.trim()) {
-      normalized.title = payload.title.trim();
-    }
-
-    return normalized;
+  private toTimestamp(value: string): number {
+    const timestamp = new Date(value).getTime();
+    return Number.isNaN(timestamp) ? 0 : timestamp;
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {

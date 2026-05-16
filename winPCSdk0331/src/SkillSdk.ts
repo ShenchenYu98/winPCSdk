@@ -4,7 +4,6 @@ import { MiniappBridge } from "./core/miniappBridge";
 import { SessionOrchestrator } from "./core/sessionOrchestrator";
 import { StreamConnectionManager, type RealtimeConnection } from "./core/streamConnectionManager";
 import type {
-  CreateSessionParams,
   CreateNewSessionParams,
   CloseSkillResult,
   ControlSkillWeCodeParams,
@@ -28,7 +27,6 @@ import type {
   SendMessageToIMResult,
   SessionMessage,
   SkillSdkApi,
-  SkillSession,
   StopSkillParams,
   StopSkillResult,
   UnregisterSessionListenerParams,
@@ -55,7 +53,7 @@ export class SkillSdk implements SkillSdkApi {
     );
   }
 
-  async createSession(params: CreateSessionParams): Promise<SkillSession> {
+  async createSession(params: CreateNewSessionParams): Promise<Session> {
     await this.connectionManager.ensureConnected();
     return this.orchestrator.createSession(params);
   }

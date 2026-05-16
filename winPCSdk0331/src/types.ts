@@ -4,18 +4,6 @@ export type SkillWeCodeAction = "close" | "minimize";
 export type PermissionResponse = "once" | "always" | "reject";
 export type SessionRole = "user" | "assistant" | "system" | "tool";
 
-export interface SkillSession {
-  welinkSessionId: string;
-  userId: string;
-  ak: string | null;
-  title: string | null;
-  imGroupId: string | null;
-  status: string;
-  toolSessionId: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Session {
   welinkSessionId: string;
   userId: string;
@@ -31,19 +19,13 @@ export interface Session {
   updatedAt: string;
 }
 
-export interface CreateSessionParams {
-  ak?: string;
-  title?: string;
-  imGroupId: string;
-}
-
 export interface CreateNewSessionParams {
-  ak: string;
+  ak?: string;
   title?: string;
   bussinessDomain?: string;
   bussinessId: string;
   bussinessType?: string;
-  assistantAccount: string;
+  assistantAccount?: string;
 }
 
 export interface StopSkillParams {
@@ -101,12 +83,14 @@ export interface SendMessageParams {
   welinkSessionId: string;
   content: string;
   toolCallId?: string;
+  subagentSessionId?: string;
 }
 
 export interface ReplyPermissionParams {
   welinkSessionId: string;
   permId: string;
   response: PermissionResponse;
+  subagentSessionId?: string;
 }
 
 export interface ControlSkillWeCodeParams {
@@ -275,7 +259,7 @@ export interface UnregisterSessionListenerResult {
 }
 
 export interface SkillSdkApi {
-  createSession(params: CreateSessionParams): Promise<SkillSession>;
+  createSession(params: CreateNewSessionParams): Promise<Session>;
   createNewSession(params: CreateNewSessionParams): Promise<Session>;
   closeSkill(): Promise<CloseSkillResult>;
   stopSkill(params: StopSkillParams): Promise<StopSkillResult>;
