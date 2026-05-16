@@ -91,9 +91,9 @@ export class SessionOrchestrator {
     const size = params.size ?? 50;
     const isFirst = params.isFirst ?? false;
     const history = await this.client.getSessionMessages(params.welinkSessionId, page, size);
-    this.cacheStore.applyHistory(params.welinkSessionId, history.content);
 
     if (!isFirst) {
+      this.cacheStore.applyHistory(params.welinkSessionId, history.content);
       return history;
     }
 
@@ -105,10 +105,16 @@ export class SessionOrchestrator {
   ): Promise<CursorResult<SessionMessage>> {
     validateSessionId(params.welinkSessionId);
 
-    return this.client.getSessionMessageHistory(
+    const history = await this.client.getSessionMessageHistory(
       params.welinkSessionId,
       params.beforeSeq,
       params.size ?? 50
+    );
+
+    return this.cacheStore.toFirstFetchCursorResult(
+      params.welinkSessionId,
+      history,
+      params.beforeSeq === undefined
     );
   }
 
