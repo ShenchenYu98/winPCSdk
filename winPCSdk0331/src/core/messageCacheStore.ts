@@ -1,16 +1,10 @@
 import type {
-  CursorResult,
   PageResult,
   SessionMessage,
   SessionMessagePart,
   SessionRole,
   StreamMessage
 } from "../types";
-
-const MAX_CACHED_SESSIONS = 50;
-const MAX_MESSAGES_PER_SESSION = 200;
-const MAX_LOCAL_MESSAGES_PER_SESSION = 10;
-const MAX_FINAL_TEXTS_PER_SESSION = 100;
 
 interface CachedMessage {
   id: string;
@@ -30,20 +24,14 @@ export class MessageCacheStore {
   private readonly localSessions = new Map<string, Map<string, CachedMessage>>();
   private readonly finalTexts = new Map<string, Map<string, string>>();
   private readonly orderedMessageIds = new Map<string, string[]>();
-  private readonly sessionAccessOrder = new Map<string, true>();
 
   applyHistory(sessionId: string, messages: SessionMessage[]): void {
-    this.touchSession(sessionId);
     for (const message of messages) {
       this.upsertSessionMessage(sessionId, message);
     }
-    this.pruneSession(sessionId);
-    this.pruneSessions();
   }
 
   applyStream(message: StreamMessage): void {
-    this.touchSession(message.welinkSessionId);
-
     if (message.type === "snapshot" && message.messages) {
       this.applyHistory(message.welinkSessionId, message.messages);
       return;
@@ -67,8 +55,6 @@ export class MessageCacheStore {
       sessionStore.set(messageId, cached);
       this.saveLocalMessage(message.welinkSessionId, cached);
       this.trackOrder(message.welinkSessionId);
-      this.pruneSession(message.welinkSessionId);
-      this.pruneSessions();
       return;
     }
 
@@ -128,13 +114,9 @@ export class MessageCacheStore {
     if (shouldPersistFinalText(message.type, message.status)) {
       this.saveFinalText(message.welinkSessionId, messageId, cached.content ?? "");
     }
-
-    this.pruneSession(message.welinkSessionId);
-    this.pruneSessions();
   }
 
   getMergedMessages(sessionId: string, history: SessionMessage[]): SessionMessage[] {
-    this.touchSession(sessionId);
     this.applyHistory(sessionId, history);
     const sessionStore = this.sessions.get(sessionId);
 
@@ -147,37 +129,7 @@ export class MessageCacheStore {
       .map(([, message]) => toSessionMessage(message));
   }
 
-  toFirstFetchCursorResult(
-    sessionId: string,
-    historyResult: CursorResult<SessionMessage>,
-    isFirstFetch: boolean
-  ): CursorResult<SessionMessage> {
-    this.touchSession(sessionId);
-
-    if (!isFirstFetch) {
-      this.applyHistory(sessionId, historyResult.content);
-      return historyResult;
-    }
-
-    const localMessage = this.getLatestAggregatedMessage(sessionId);
-    this.applyHistory(sessionId, historyResult.content);
-
-    if (!localMessage) {
-      return historyResult;
-    }
-
-    const contentWithoutDuplicate = historyResult.content.filter(
-      (message) => message.id !== localMessage.id
-    );
-
-    return {
-      ...historyResult,
-      content: [...contentWithoutDuplicate, localMessage]
-    };
-  }
-
   getFinalText(sessionId: string, messageId?: string): string | undefined {
-    this.touchSession(sessionId);
     const sessionTexts = this.finalTexts.get(sessionId);
     const sessionOrder = this.orderedMessageIds.get(sessionId) ?? [];
 
@@ -201,17 +153,14 @@ export class MessageCacheStore {
   }
 
   hasMessage(sessionId: string, messageId: string): boolean {
-    this.touchSession(sessionId);
     return this.sessions.get(sessionId)?.has(messageId) ?? false;
   }
 
   hasFinalText(sessionId: string, messageId: string): boolean {
-    this.touchSession(sessionId);
     return this.finalTexts.get(sessionId)?.has(messageId) ?? false;
   }
 
   getLastUserMessageContent(sessionId: string): string | undefined {
-    this.touchSession(sessionId);
     const sessionStore = this.sessions.get(sessionId);
 
     if (!sessionStore) {
@@ -242,9 +191,7 @@ export class MessageCacheStore {
     sessionId: string,
     historyPage: PageResult<SessionMessage>
   ): PageResult<SessionMessage> {
-    this.touchSession(sessionId);
     const localMessage = this.getLatestAggregatedMessage(sessionId);
-    this.applyHistory(sessionId, historyPage.content);
 
     if (!localMessage) {
       return historyPage;
@@ -264,7 +211,6 @@ export class MessageCacheStore {
   }
 
   getLatestAggregatedMessage(sessionId: string): SessionMessage | undefined {
-    this.touchSession(sessionId);
     const localSessionStore = this.localSessions.get(sessionId);
 
     if (!localSessionStore || localSessionStore.size === 0) {
@@ -280,7 +226,6 @@ export class MessageCacheStore {
     this.localSessions.clear();
     this.finalTexts.clear();
     this.orderedMessageIds.clear();
-    this.sessionAccessOrder.clear();
   }
 
   private upsertSessionMessage(sessionId: string, message: SessionMessage): void {
@@ -300,7 +245,6 @@ export class MessageCacheStore {
       parts: new Map(parts.map((part) => [part.partId, part])),
       createdAt: message.createdAt
     });
-    this.localSessions.get(sessionId)?.delete(key);
     this.trackOrder(sessionId);
 
     if (message.content !== null && message.content !== undefined) {
@@ -387,110 +331,6 @@ export class MessageCacheStore {
       .map(([key]) => key);
 
     this.orderedMessageIds.set(sessionId, orderedEntries);
-  }
-
-  private touchSession(sessionId: string): void {
-    if (!sessionId) {
-      return;
-    }
-
-    this.sessionAccessOrder.delete(sessionId);
-    this.sessionAccessOrder.set(sessionId, true);
-  }
-
-  private pruneSessions(): void {
-    while (this.sessionAccessOrder.size > MAX_CACHED_SESSIONS) {
-      const oldestSessionId = this.sessionAccessOrder.keys().next().value as string | undefined;
-      if (!oldestSessionId) {
-        return;
-      }
-      this.deleteSession(oldestSessionId);
-    }
-  }
-
-  private pruneSession(sessionId: string): void {
-    this.pruneMessageStore(sessionId);
-    this.pruneLocalSessionStore(sessionId);
-    this.pruneFinalTexts(sessionId);
-  }
-
-  private pruneMessageStore(sessionId: string): void {
-    const sessionStore = this.sessions.get(sessionId);
-
-    if (!sessionStore || sessionStore.size <= MAX_MESSAGES_PER_SESSION) {
-      this.trackOrder(sessionId);
-      return;
-    }
-
-    const sortedEntries = [...sessionStore.entries()].sort((left, right) =>
-      compareCachedEntries(left[0], left[1], right[0], right[1])
-    );
-    const entriesToRemove = sortedEntries.slice(0, sortedEntries.length - MAX_MESSAGES_PER_SESSION);
-
-    for (const [messageId] of entriesToRemove) {
-      sessionStore.delete(messageId);
-      this.localSessions.get(sessionId)?.delete(messageId);
-      this.finalTexts.get(sessionId)?.delete(messageId);
-    }
-
-    this.trackOrder(sessionId);
-  }
-
-  private pruneLocalSessionStore(sessionId: string): void {
-    const localSessionStore = this.localSessions.get(sessionId);
-
-    if (!localSessionStore) {
-      return;
-    }
-
-    if (localSessionStore.size <= MAX_LOCAL_MESSAGES_PER_SESSION) {
-      return;
-    }
-
-    const sortedEntries = [...localSessionStore.entries()].sort((left, right) =>
-      compareCachedEntries(left[0], left[1], right[0], right[1])
-    );
-    const entriesToRemove = sortedEntries.slice(0, sortedEntries.length - MAX_LOCAL_MESSAGES_PER_SESSION);
-
-    for (const [messageId] of entriesToRemove) {
-      localSessionStore.delete(messageId);
-    }
-  }
-
-  private pruneFinalTexts(sessionId: string): void {
-    const sessionTexts = this.finalTexts.get(sessionId);
-
-    if (!sessionTexts || sessionTexts.size <= MAX_FINAL_TEXTS_PER_SESSION) {
-      return;
-    }
-
-    const sessionOrder = this.orderedMessageIds.get(sessionId) ?? [];
-    const messageIdsToKeep = new Set(
-      sessionOrder.filter((messageId) => sessionTexts.has(messageId)).slice(-MAX_FINAL_TEXTS_PER_SESSION)
-    );
-
-    if (messageIdsToKeep.size < MAX_FINAL_TEXTS_PER_SESSION) {
-      for (const messageId of [...sessionTexts.keys()].reverse()) {
-        if (messageIdsToKeep.size >= MAX_FINAL_TEXTS_PER_SESSION) {
-          break;
-        }
-        messageIdsToKeep.add(messageId);
-      }
-    }
-
-    for (const messageId of sessionTexts.keys()) {
-      if (!messageIdsToKeep.has(messageId)) {
-        sessionTexts.delete(messageId);
-      }
-    }
-  }
-
-  private deleteSession(sessionId: string): void {
-    this.sessions.delete(sessionId);
-    this.localSessions.delete(sessionId);
-    this.finalTexts.delete(sessionId);
-    this.orderedMessageIds.delete(sessionId);
-    this.sessionAccessOrder.delete(sessionId);
   }
 }
 
