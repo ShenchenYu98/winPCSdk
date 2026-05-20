@@ -9,17 +9,18 @@ import type {
   SendMessageParams,
   SendMessageResult,
   SendMessageToIMResult,
+  Session,
   SessionMessage,
-  SkillSession,
+  StopSkillParams,
   StopSkillResult
 } from "../types";
 
 interface CreateNewSessionPayload {
   ak?: string;
   title?: string;
-  bussinessDomain: string;
-  bussinessId: string;
-  bussinessType: string;
+  businessSessionDomain: string;
+  businessSessionId: string;
+  businessSessionType: string;
   assistantAccount?: string;
 }
 
@@ -32,7 +33,7 @@ interface Layer1Response<T> {
 export class SkillServerClient {
   constructor(private readonly baseUrl: string) {}
 
-  async getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillSession>> {
+  async getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<Session>> {
     const query = new URLSearchParams({
       page: String(params.page),
       size: String(params.size)
@@ -46,8 +47,8 @@ export class SkillServerClient {
       query.set("ak", params.ak.trim());
     }
 
-    if (params.bussinessId?.trim()) {
-      query.set("bussinessId", params.bussinessId.trim());
+    if (params.businessSessionId?.trim()) {
+      query.set("businessSessionId", params.businessSessionId.trim());
     }
 
     if (params.assistantAccount?.trim()) {
@@ -58,13 +59,13 @@ export class SkillServerClient {
       query.set("businessSessionDomain", params.businessSessionDomain.trim());
     }
 
-    return this.request<PageResult<SkillSession>>(`/api/skill/sessions?${query.toString()}`);
+    return this.request<PageResult<Session>>(`/api/skill/sessions?${query.toString()}`);
   }
 
-  async createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
-    this.validateRequired(params.bussinessId, "bussinessId");
+  async createNewSession(params: CreateNewSessionParams): Promise<Session> {
+    this.validateRequired(params.businessSessionId, "businessSessionId");
 
-    return this.request<SkillSession>("/api/skill/sessions", {
+    return this.request<Session>("/api/skill/sessions", {
       method: "POST",
       body: JSON.stringify(this.normalizeCreateNewSessionPayload(params))
     });
@@ -76,19 +77,25 @@ export class SkillServerClient {
 
     return this.request<SendMessageResult>(`/api/skill/sessions/${params.welinkSessionId}/messages`, {
       method: "POST",
-      body: JSON.stringify({
-        content: params.content,
-        toolCallId: params.toolCallId
-      })
+      body: JSON.stringify(
+        compactBody({
+          content: params.content,
+          toolCallId: params.toolCallId,
+          subagentSessionId: params.subagentSessionId,
+          questionId: params.questionId,
+          businessExtParam: params.businessExtParam
+        })
+      )
     });
   }
 
-  async abortSession(welinkSessionId: string): Promise<StopSkillResult> {
-    this.validateSessionId(welinkSessionId);
+  async abortSession(params: StopSkillParams): Promise<StopSkillResult> {
+    this.validateSessionId(params.welinkSessionId);
 
-    return this.request<StopSkillResult>(`/api/skill/sessions/${welinkSessionId}/abort`, {
-      method: "POST"
-    });
+    return this.request<StopSkillResult>(
+      `/api/skill/sessions/${params.welinkSessionId}/abort`,
+      withOptionalJsonBody({ method: "POST" }, { subagentSessionId: params.subagentSessionId })
+    );
   }
 
   async getSessionMessages(
@@ -124,12 +131,19 @@ export class SkillServerClient {
   async replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult> {
     this.validateSessionId(params.welinkSessionId);
     this.validateRequired(params.permId, "permId");
+    this.validateRequired(params.response, "response");
 
     return this.request<ReplyPermissionResult>(
       `/api/skill/sessions/${params.welinkSessionId}/permissions/${params.permId}`,
       {
         method: "POST",
-        body: JSON.stringify({ response: params.response })
+        body: JSON.stringify(
+          compactBody({
+            response: params.response,
+            subagentSessionId: params.subagentSessionId,
+            businessExtParam: params.businessExtParam
+          })
+        )
       }
     );
   }
@@ -151,7 +165,7 @@ export class SkillServerClient {
     );
   }
 
-  async createSession(params: CreateNewSessionParams): Promise<SkillSession> {
+  async createSession(params: CreateNewSessionParams): Promise<Session> {
     const sessions = await this.listReusableSessions(params);
     const latestReusableSession = sessions.content
       .filter((session) => {
@@ -167,35 +181,35 @@ export class SkillServerClient {
     return this.createNewSession(params);
   }
 
-  private async listReusableSessions(params: CreateNewSessionParams): Promise<PageResult<SkillSession>> {
+  private async listReusableSessions(params: CreateNewSessionParams): Promise<PageResult<Session>> {
     const query = new URLSearchParams({ page: "0", size: "50" });
 
     if (params.ak?.trim()) {
       query.set("ak", params.ak.trim());
     }
 
-    if (params.bussinessId?.trim()) {
-      query.set("bussinessId", params.bussinessId.trim());
+    if (params.businessSessionId?.trim()) {
+      query.set("businessSessionId", params.businessSessionId.trim());
     }
 
     if (params.assistantAccount?.trim()) {
       query.set("assistantAccount", params.assistantAccount.trim());
     }
 
-    if (params.bussinessDomain?.trim()) {
-      query.set("businessSessionDomain", params.bussinessDomain.trim());
+    if (params.businessSessionDomain?.trim()) {
+      query.set("businessSessionDomain", params.businessSessionDomain.trim());
     }
 
-    return this.request<PageResult<SkillSession>>(`/api/skill/sessions?${query.toString()}`);
+    return this.request<PageResult<Session>>(`/api/skill/sessions?${query.toString()}`);
   }
 
   private normalizeCreateNewSessionPayload(
     payload: CreateNewSessionParams
   ): CreateNewSessionPayload {
     const normalized: CreateNewSessionPayload = {
-      bussinessDomain: payload.bussinessDomain?.trim() || "miniapp",
-      bussinessId: payload.bussinessId.trim(),
-      bussinessType: payload.bussinessType?.trim() || "direct"
+      businessSessionDomain: payload.businessSessionDomain?.trim() || "miniapp",
+      businessSessionId: payload.businessSessionId.trim(),
+      businessSessionType: payload.businessSessionType?.trim() || "direct"
     };
 
     if (payload.ak?.trim()) {
@@ -269,4 +283,33 @@ export class SkillServerClient {
       throw createSdkError(1000, "无效的参数: welinkSessionId");
     }
   }
+}
+
+function compactBody(body: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(body).filter(([, value]) => {
+      if (value === undefined) {
+        return false;
+      }
+
+      if (typeof value === "string") {
+        return value.trim().length > 0;
+      }
+
+      return true;
+    })
+  );
+}
+
+function withOptionalJsonBody(init: RequestInit, body: Record<string, unknown>): RequestInit {
+  const compacted = compactBody(body);
+
+  if (Object.keys(compacted).length === 0) {
+    return init;
+  }
+
+  return {
+    ...init,
+    body: JSON.stringify(compacted)
+  };
 }

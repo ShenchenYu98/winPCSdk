@@ -24,9 +24,9 @@ import type {
   SendMessageResult,
   SendMessageToIMParams,
   SendMessageToIMResult,
+  Session,
   SessionMessage,
   SkillSdkApi,
-  SkillSession,
   StopSkillParams,
   StopSkillResult,
   UnregisterSessionListenerParams,
@@ -53,12 +53,12 @@ export class SkillSdk implements SkillSdkApi {
     );
   }
 
-  async createSession(params: CreateNewSessionParams): Promise<SkillSession> {
+  async createSession(params: CreateNewSessionParams): Promise<Session> {
     await this.connectionManager.ensureConnected();
     return this.orchestrator.createSession(params);
   }
 
-  async createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
+  async createNewSession(params: CreateNewSessionParams): Promise<Session> {
     await this.connectionManager.ensureConnected();
     return this.orchestrator.createNewSession(params);
   }
@@ -71,7 +71,7 @@ export class SkillSdk implements SkillSdkApi {
 
   async stopSkill(params: StopSkillParams): Promise<StopSkillResult> {
     await this.connectionManager.ensureConnected();
-    const result = await this.client.abortSession(params.welinkSessionId);
+    const result = await this.client.abortSession(params);
     this.connectionManager.emitStatus(params.welinkSessionId, { status: "stopped" });
     return result;
   }
@@ -110,7 +110,7 @@ export class SkillSdk implements SkillSdkApi {
 
   async getHistorySessionsList(
     params: HistorySessionsParams
-  ): Promise<PageResult<SkillSession>> {
+  ): Promise<PageResult<Session>> {
     await this.connectionManager.ensureConnected();
     return this.orchestrator.getHistorySessionsList(params);
   }

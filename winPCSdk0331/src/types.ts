@@ -4,7 +4,7 @@ export type SkillWeCodeAction = "close" | "minimize";
 export type PermissionResponse = "once" | "always" | "reject";
 export type SessionRole = "user" | "assistant" | "system" | "tool";
 
-export interface SkillSession {
+export interface Session {
   welinkSessionId: string;
   userId: string;
   ak: string | null;
@@ -22,14 +22,15 @@ export interface SkillSession {
 export interface CreateNewSessionParams {
   ak?: string;
   title?: string;
-  bussinessDomain?: string;
-  bussinessId: string;
-  bussinessType?: string;
+  businessSessionDomain?: string;
+  businessSessionId: string;
+  businessSessionType?: string;
   assistantAccount?: string;
 }
 
 export interface StopSkillParams {
   welinkSessionId: string;
+  subagentSessionId?: string;
 }
 
 export interface RegenerateAnswerParams {
@@ -63,7 +64,7 @@ export interface HistorySessionsParams {
   size?: number;
   status?: "ACTIVE" | "IDLE" | "CLOSED";
   ak?: string;
-  bussinessId?: string;
+  businessSessionId?: string;
   assistantAccount?: string;
   businessSessionDomain?: "miniapp" | "im";
 }
@@ -84,6 +85,8 @@ export interface SendMessageParams {
   content: string;
   toolCallId?: string;
   subagentSessionId?: string;
+  questionId?: string;
+  businessExtParam?: Record<string, unknown>;
 }
 
 export interface ReplyPermissionParams {
@@ -91,6 +94,7 @@ export interface ReplyPermissionParams {
   permId: string;
   response: PermissionResponse;
   subagentSessionId?: string;
+  businessExtParam?: Record<string, unknown>;
 }
 
 export interface ControlSkillWeCodeParams {
@@ -259,8 +263,8 @@ export interface UnregisterSessionListenerResult {
 }
 
 export interface SkillSdkApi {
-  createSession(params: CreateNewSessionParams): Promise<SkillSession>;
-  createNewSession(params: CreateNewSessionParams): Promise<SkillSession>;
+  createSession(params: CreateNewSessionParams): Promise<Session>;
+  createNewSession(params: CreateNewSessionParams): Promise<Session>;
   closeSkill(): Promise<CloseSkillResult>;
   stopSkill(params: StopSkillParams): Promise<StopSkillResult>;
   onSessionStatusChange(params: OnSessionStatusChangeParams): void;
@@ -271,7 +275,7 @@ export interface SkillSdkApi {
   getSessionMessageHistory(
     params: GetSessionMessageHistoryParams
   ): Promise<CursorResult<SessionMessage>>;
-  getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillSession>>;
+  getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<Session>>;
   registerSessionListener(
     params: RegisterSessionListenerParams
   ): RegisterSessionListenerResult;
