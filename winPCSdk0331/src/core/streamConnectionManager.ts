@@ -191,16 +191,19 @@ export class StreamConnectionManager {
 
     this.replayingSessions.add(sessionId);
 
-    for (const event of [...cache.events]) {
+    const events = [...cache.events];
+
+    for (const [index, event] of events.entries()) {
       if (this.listeners.get(sessionId) !== listener) {
         break;
       }
 
-      listener.onMessage(withDeliveryMode(event, "replay"));
-    }
-
-    if (this.listeners.get(sessionId) === listener) {
-      listener.onMessage(createReplayDoneMessage(sessionId, cache.truncated));
+      listener.onMessage(
+        withDeliveryMode(event, "replay", {
+          replayDone: index === events.length - 1,
+          replayTruncated: index === events.length - 1 && cache.truncated
+        })
+      );
     }
 
     this.replayingSessions.delete(sessionId);
@@ -353,23 +356,14 @@ function cloneReplayEvent(message: StreamMessage): StreamMessage {
 
 function withDeliveryMode(
   message: StreamMessage,
-  deliveryMode: NonNullable<StreamMessage["deliveryMode"]>
+  deliveryMode: NonNullable<StreamMessage["deliveryMode"]>,
+  replayState?: { replayDone?: boolean; replayTruncated?: boolean }
 ): StreamMessage {
   return {
     ...cloneStreamMessage(message),
-    deliveryMode
-  };
-}
-
-function createReplayDoneMessage(sessionId: string, replayTruncated: boolean): StreamMessage {
-  return {
-    type: "replay.done",
-    seq: null,
-    welinkSessionId: sessionId,
-    emittedAt: null,
-    deliveryMode: "replay",
-    replayDone: true,
-    replayTruncated: replayTruncated || undefined
+    deliveryMode,
+    replayDone: replayState?.replayDone || undefined,
+    replayTruncated: replayState?.replayTruncated || undefined
   };
 }
 
