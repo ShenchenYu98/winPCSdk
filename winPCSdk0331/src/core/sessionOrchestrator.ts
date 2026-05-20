@@ -14,8 +14,8 @@ import type {
   SendMessageResult,
   SendMessageToIMParams,
   SendMessageToIMResult,
+  Session,
   SessionMessage,
-  SkillSession
 } from "../types";
 import { MessageCacheStore } from "./messageCacheStore";
 
@@ -25,12 +25,12 @@ export class SessionOrchestrator {
     private readonly cacheStore: MessageCacheStore
   ) {}
 
-  async createSession(params: CreateNewSessionParams): Promise<SkillSession> {
+  async createSession(params: CreateNewSessionParams): Promise<Session> {
     validateRequired(params.bussinessId, "bussinessId");
     return this.client.createSession(params);
   }
 
-  async createNewSession(params: CreateNewSessionParams): Promise<SkillSession> {
+  async createNewSession(params: CreateNewSessionParams): Promise<Session> {
     validateRequired(params.bussinessId, "bussinessId");
 
     return this.client.createNewSession({
@@ -114,7 +114,7 @@ export class SessionOrchestrator {
 
   async getHistorySessionsList(
     params: HistorySessionsParams
-  ): Promise<PageResult<SkillSession>> {
+  ): Promise<PageResult<Session>> {
     return this.client.getHistorySessionsList({
       ...params,
       page: params.page ?? 0,

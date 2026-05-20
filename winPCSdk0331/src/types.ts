@@ -4,7 +4,7 @@ export type SkillWeCodeAction = "close" | "minimize";
 export type PermissionResponse = "once" | "always" | "reject";
 export type SessionRole = "user" | "assistant" | "system" | "tool";
 
-export interface SkillSession {
+export interface Session {
   welinkSessionId: string;
   userId: string;
   ak: string | null;
@@ -259,8 +259,8 @@ export interface UnregisterSessionListenerResult {
 }
 
 export interface SkillSdkApi {
-  createSession(params: CreateNewSessionParams): Promise<SkillSession>;
-  createNewSession(params: CreateNewSessionParams): Promise<SkillSession>;
+  createSession(params: CreateNewSessionParams): Promise<Session>;
+  createNewSession(params: CreateNewSessionParams): Promise<Session>;
   closeSkill(): Promise<CloseSkillResult>;
   stopSkill(params: StopSkillParams): Promise<StopSkillResult>;
   onSessionStatusChange(params: OnSessionStatusChangeParams): void;
@@ -271,7 +271,7 @@ export interface SkillSdkApi {
   getSessionMessageHistory(
     params: GetSessionMessageHistoryParams
   ): Promise<CursorResult<SessionMessage>>;
-  getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillSession>>;
+  getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<Session>>;
   registerSessionListener(
     params: RegisterSessionListenerParams
   ): RegisterSessionListenerResult;
