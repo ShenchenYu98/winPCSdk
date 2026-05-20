@@ -25,6 +25,7 @@ Skill SDK 是 IM 客户端与 Skill 小程序共用的一层客户端 SDK，负�
 | `createSession` | `POST /api/skill/sessions` | SDK 可在内部结合 `GET /api/skill/sessions` 做会话复用 |
 | `sendMessage` | `POST /api/skill/sessions/{sessionId}/messages` | 出参按 `ProtocolMessageView` 对齐 |
 | `getSessionMessage` | `GET /api/skill/sessions/{sessionId}/messages` | 出参按 `PageResult<ProtocolMessageView>` 对齐 |
+| `getSessionMessageHistory` | `GET /api/skill/sessions/{sessionId}/messages/history` | 游标查询历史消息，适用于聊天首屏与上拉加载 |
 | `sendMessageToIM` | `POST /api/skill/sessions/{sessionId}/send-to-im` | SDK 按 `messageId` 本地取完成的消息内容并透传 `chatId` |
 | `replyPermission` | `POST /api/skill/sessions/{sessionId}/permissions/{permId}` | 出参字段与服务端一致 |
 | `stopSkill` | `POST /api/skill/sessions/{id}/abort` | 中止当前轮回答，不关闭会话 |
@@ -49,7 +50,7 @@ IM 客户端调用
 ### 接口名
 
 ```typescript
-createSession(params: CreateNewSessionParams): Promise<SkillSession>
+createSession(params: CreateNewSessionParams): Promise<Session>
 ```
 
 ### 入参
@@ -127,7 +128,6 @@ createSession(params: CreateNewSessionParams): Promise<SkillSession>
         "businessSessionDomain": "miniapp",
         "page": 0,
         "size": 50,
-        "status": "IDLE",
         "assistantAccount": "x001_1"
      }
      ```
@@ -279,6 +279,7 @@ stopSkill(params: StopSkillParams): Promise<StopSkillResult>
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | `welinkSessionId` | string | 是 | 会话 ID |
+| `subagentSessionId` | string | 否 | subagent 场景必传。传入时仅中止指定子 agent 链路；不传则中止主会话当前回答 |
 
 ### 出参
 
@@ -317,12 +318,16 @@ stopSkill(params: StopSkillParams): Promise<StopSkillResult>
 在与其他接口组合调用时：
 1. 若 `stopSkill` 失败，不影响会话的其他操作
 2. 停止后，仍可以继续发送新消息触发新一轮 AI 执行
+3. 若当前只想中止子 agent，而不是整条主对话链路，则必须透传原始 `subagentSessionId`
 
 ### 调用示例
 
 ```typescript
 try {
-  const result = await stopSkill({ welinkSessionId: "42" });
+  const result = await stopSkill({
+    welinkSessionId: "42",
+    subagentSessionId: "child-session-001"
+  });
 
   if (result.status === "aborted") {
     console.log("当前轮回答已停止");
@@ -939,6 +944,88 @@ try {
 }
 ```
 
+### 8.1 新增：获取当前会话历史消息（游标查询）接口
+
+#### 调用方
+
+we码调用
+
+#### 接口说明
+
+新增游标查询能力，用于聊天页首屏加载和上拉加载更早消息。该接口不依赖 `page/total`，通过游标 `nextBeforeSeq` 逐批次向前翻页。
+
+#### 接口名
+
+```typescript
+getSessionMessageHistory(params: GetSessionMessageHistoryParams): Promise<CursorResult<SessionMessage>>
+```
+
+#### 入参
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| welinkSessionId | string | 是 | - | 会话 ID |
+| beforeSeq | number | 否 | - | 查询该序号之前的更早消息；首屏加载不传 |
+| size | number | 否 | 50 | 每次拉取条数 |
+
+#### 出参
+
+| 参数名 | 类型 | 说明 |
+|--------|------|------|
+| content | Array<SessionMessage> | 当前批次消息列表（SDK 透传服务端顺序；当前服务端为消息时间正序） |
+| size | number | 本次查询的 page size |
+| hasMore | boolean | 是否还有更早消息 |
+| nextBeforeSeq | number \| null | 下次继续向前翻页时使用的游标 |
+
+#### 实现方法
+
+1. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连。
+2. 调用服务端：
+   - **URL**: `GET /api/skill/sessions/{welinkSessionId}/messages/history`
+   - **查询参数**: `beforeSeq`（可选）、`size`（可选，默认 50）
+3. SDK 直接透传服务端返回的 `content` / `size` / `hasMore` / `nextBeforeSeq`。
+
+#### 组合调用建议
+
+1. 首屏加载：不传 `beforeSeq`，仅传 `size`。
+2. 上拉加载更早消息：传上一次响应中的 `nextBeforeSeq`。
+3. 当 `hasMore=false` 时停止继续请求。
+
+#### 调用示例
+
+```typescript
+try {
+  // 首屏加载
+  const firstPage = await getSessionMessageHistory({
+    welinkSessionId: "42",
+    size: 50
+  });
+
+  // 上拉加载更早消息
+  if (firstPage.hasMore && firstPage.nextBeforeSeq !== null) {
+    const olderPage = await getSessionMessageHistory({
+      welinkSessionId: "42",
+      size: 50,
+      beforeSeq: firstPage.nextBeforeSeq
+    });
+
+    console.log("更早消息条数:", olderPage.content.length);
+  }
+} catch (error) {
+  console.error("游标查询消息失败:", error.errorCode, error.errorMessage);
+}
+```
+
+### Subagent 支持说明（V1 增量）
+
+为支持 OpenCode subagent / task 场景，V1 在现有主会话协议之上补充以下约定：
+
+1. SDK 仍以主会话 `welinkSessionId` 为监听与查询入口，不新增第二条 WebSocket 监听通道。
+2. 当服务端事件来自子 agent 时，会在 `StreamMessage`、`SessionMessagePart`、`snapshot.messages[].parts[]`、`streaming.parts[]` 中附带 subagent 扩展字段。
+3. 客户端可按 `subagentSessionId` 对子 agent 产生的 `text` / `thinking` / `tool` / `file` / `permission` / `question` 进行分组展示。
+4. 当用户回复子 agent 发起的 `permission.ask` 或 `question` 时，应在 `replyPermission` 或 `sendMessage` 中透传 `subagentSessionId`，用于服务端路由到真实子会话。
+5. 所有 subagent 扩展字段均为可选字段；未携带时，按普通主会话消息处理，保持与旧版本兼容。
+
 ---
 
 ## 9. 注册会话监听器接口
@@ -951,6 +1038,13 @@ we码调用
 
 同一个 `welinkSessionId` 只允许注册一次监听；若已注册，再次注册不做任何处理，仍返回 `status: success`。
 
+为支持“页面未打开时，客户端已提前发起对话，服务端正在持续流式返回”的场景，SDK 在本地按 `welinkSessionId` 缓存当前未完成轮次的全部原始 `onmessage` 事件。当调用 `registerSessionListener` 时，若该会话存在未完成轮次缓存，则 SDK 会先按原始到达顺序通过 `onMessage` 逐条补发缓存事件，再继续回调后续实时事件。
+
+为支持前端将“缓存补发内容”与“页面打开后才收到的实时内容”采用不同渲染策略，SDK 在 `StreamMessage` 上新增两个本地扩展字段：
+
+- `deliveryMode`：标识当前事件是缓存补发事件还是实时事件
+- `replayDone`：标识当前轮次缓存补发已结束，前端可据此将补发阶段聚合出的内容一次性落盘展示
+
 SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，覆盖以下事件：
 
 - 文本流：`text.delta` / `text.done`
@@ -959,19 +1053,28 @@ SDK 对外暴露的 `StreamMessage` 与服务端 WebSocket 协议保持对齐，
 - 提问交互：`question`
 - 权限交互：`permission.ask` / `permission.reply`
 - 附件：`file`
+- 用户消息回放：`message.user`
+- 推理步骤：`step.start` / `step.done`
 - 会话状态：`session.status` / `session.title` / `session.error`
 - 断线恢复：`snapshot` / `streaming`
+- 云端扩展：`planning.delta` / `planning.done` / `searching` / `search_result` / `reference` / `ask_more`
 - 系统事件：`agent.online` / `agent.offline` / `error`
 
 #### 字段对齐说明（重要）
 
+- WebSocket 每帧直接返回一个平铺的 `StreamMessage` JSON，对外**没有外层 envelope**
 - `snapshot.messages[].id` 类型为 `string`（稳定消息 ID）
 - `snapshot.messages[].seq` 类型为 `number | null`（数据库排序序号，用户消息可能为 `null`）
 - `snapshot.messages[].messageSeq` 类型为 `number | null`（会话内消息序号）
 - `snapshot.messages[].contentType` 类型为 `string`（`plain` / `markdown`）
 - `streaming.messageId` 类型为 `string | null`（仅 `parts` 非空时出现）
 - `streaming.parts[].status` 为工具状态字段（字段名为 `status`）
+- `question` 事件分为两阶段：`running` 阶段带 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam`，`completed` / `error` 阶段主要返回 `status` / `toolName` / `toolCallId` / `output`
+- `permission.reply` 为极简事件，通常不带 `messageId` / `partId` / `partSeq` / `emittedAt`
+- `agent.online` / `agent.offline` 为极简事件，仅包含 `type` 与 `seq`；其中 `agent.offline` 可能重复下发，前端建议按离线周期去重
+- `search_result` 使用字段 `searchResults`，`ask_more` 使用字段 `askMoreQuestions`
 - `session.status` / `session.title` / `session.error` / `agent.online` / `agent.offline` / `error` 属于传输层事件，不应作为 `SessionMessage` 聚合入消息列表
+- `deliveryMode` 与 `replayDone` 为 SDK 本地补充字段，不要求服务端返回；SDK 在监听器分发阶段负责补齐
 
 ### 接口名
 
@@ -1018,10 +1121,74 @@ interface SessionError {
 
 1. SDK 内部维护每个会话唯一监听器（`onMessage`/`onError`/`onClose`）记录
 2. 同一 `welinkSessionId` 仅允许注册一次；重复注册不做任何处理并返回 `status: success`
-3. 若 WebSocket 已建立，则监听器立即生效
-4. 若 WebSocket 尚未建立，则监听器先暂存，待连接建立后自动生效
-5. 连接错误时触发 `onError`
-6. 连接关闭时触发 `onClose`
+3. SDK 在本地按 `welinkSessionId` 维护“当前未完成轮次”的原始 `StreamMessage` 缓存：
+   - 缓存内容为当前轮次收到的全部原始 `onmessage` 事件
+   - 不区分事件类型，不做消息聚合，不改写字段结构
+   - 事件写入缓存时必须保持原始到达顺序
+4. 当某会话当前不存在未完成轮次缓存时，收到新的 `onmessage` 事件后，SDK 应创建新的当前轮次缓存；后续事件持续追加到该缓存中
+5. 以下事件视为当前轮次结束；终止事件本身也需要写入当前轮次缓存，确保前端在补发场景中也能收到完整结束信号：
+   - `session.status` 且 `sessionStatus = idle`
+   - `session.error`
+   - `error`
+   - `agent.offline`
+6. 调用 `registerSessionListener` 时：
+   - 若该 `welinkSessionId` 存在当前未完成轮次缓存，则 SDK 必须先按原始到达顺序，通过 `onMessage` 逐条补发缓存中的全部事件
+   - 该阶段补发的每条事件，SDK 都必须补充 `deliveryMode = replay`
+   - 若该轮次缓存已结束，则不应再通过 `registerSessionListener` 回放该轮次缓存；此时页面应以 `getSessionMessageHistory` 返回的服务端历史为准恢复最终消息内容
+   - 当前轮次缓存补发完成后，SDK 必须额外回调一次 `replayDone = true` 的结束信号；该信号用于通知前端“补发阶段已完成”
+   - `replayDone = true` 的结束信号建议同时携带 `deliveryMode = replay`
+   - 当前轮次缓存补发完成后，再开始回调后续实时事件；实时事件必须补充 `deliveryMode = live`
+7. 若缓存补发期间又收到新的实时事件，SDK 需先将这些事件暂存到内部待发队列，待缓存补发完成后，再按顺序继续回调，保证前端接收到的始终是一条严格有序的事件流
+8. 若 WebSocket 已建立，则监听器立即生效；若 WebSocket 尚未建立，则监听器先暂存，待连接建立后自动生效
+9. 连接错误时触发 `onError`
+10. 连接关闭时触发 `onClose`
+
+#### 当前未完成轮次缓存说明
+
+1. 缓存粒度为 `welinkSessionId`
+2. 缓存内容为当前轮次的全部原始 `StreamMessage` 事件，不新增包装结构，不生成聚合消息
+3. `unregisterSessionListener` 仅移除当前监听器，不应主动清空该会话的当前未完成轮次缓存
+4. 若同一 `welinkSessionId` 在上一轮缓存已结束后再次收到新事件，SDK 应先清理上一轮已结束缓存，再开启下一轮新的未完成轮次缓存
+5. 调用 `closeSkill`、`shutdown`、`destroyInstance` 或 SDK 实例销毁时，应立即清理该会话对应缓存，避免无效残留
+6. 仅处于未完成状态的当前轮次缓存参与 `registerSessionListener` 回放；已结束轮次缓存不再作为回放源
+7. 该机制的目标是保证页面在未注册监听期间错过的流式事件，能够在后续注册监听时通过同一套 `onMessage` 回调链路补回给前端
+8. 缓存内容仍然是“当前未完成轮次的全量原始事件”；`deliveryMode` / `replayDone` 仅在 SDK 分发给监听器时补充，不写回底层缓存
+
+#### 场景化实现说明
+
+##### 场景 1：页面已打开后，在页面内继续发送消息
+
+1. 页面首次调用 `registerSessionListener` 时，SDK 若发现该 `welinkSessionId` 存在当前未完成轮次缓存，应先回放这轮缓存中的全部原始事件
+2. 缓存回放阶段，SDK 应为每条补发事件补充 `deliveryMode = replay`
+3. 缓存回放完成后，SDK 应先回调一次 `replayDone = true` 的结束信号，再继续向该监听器转发后续实时事件
+4. 后续实时事件统一补充 `deliveryMode = live`
+5. 页面在已注册监听的状态下继续调用 `sendMessage` 发起新消息时：
+   - 后续服务端返回的实时事件继续写入当前未完成轮次缓存
+   - 同时继续实时回调给当前监听器
+6. 同一个活跃监听器注册周期内，SDK 不应重复回放同一轮缓存，避免前端对同一批事件重复渲染
+
+##### 场景 2：流式返回过程中，页面打开后又关闭，再再次打开
+
+1. 第一次打开页面时，SDK 先回放当前未完成轮次缓存，再继续回调后续实时事件
+2. 页面关闭时调用 `unregisterSessionListener`，SDK 仅移除监听器，不清理当前未完成轮次缓存
+3. 页面关闭后，若服务端仍持续返回当前轮次事件，SDK 仍需继续将这些实时事件追加写入当前未完成轮次缓存
+4. 页面再次打开并重新调用 `registerSessionListener` 时，SDK 应再次回放该 `welinkSessionId` 当前未完成轮次缓存中的全量原始事件，并为这些补发事件补充 `deliveryMode = replay`
+5. 当前轮次缓存再次回放完成后，SDK 应再次回调一次 `replayDone = true` 的结束信号，再继续回调后续实时事件；实时事件统一补充 `deliveryMode = live`
+6. 为保证第二次打开页面时能完整恢复当前流式状态，SDK 缓存的必须是“当前未完成轮次的全量原始事件”，而不能仅缓存页面未打开期间漏掉的那一部分事件
+
+##### 场景 3：当前轮流式已结束，页面打开时历史接口已能拿到最终消息
+
+1. 若当前轮次已收到结束事件，并且页面打开时可通过 `getSessionMessageHistory` 获取该轮最终消息，则页面应以服务端历史消息为准恢复最终内容
+2. 此时 SDK 不应再通过 `registerSessionListener` 回放该已结束轮次缓存，避免前端对同一轮已完成消息重复执行 `text.delta` / `text.done` / `step.done` 等渲染链路
+3. 已结束轮次缓存可保留到下一轮开始、会话关闭或实例销毁时再清理，但不再作为监听注册时的回放来源
+
+##### 回放与实时衔接要求
+
+1. 缓存回放期间，若 SDK 又收到新的实时事件，不应直接插入回调给前端
+2. 这些实时事件应先进入内部待发队列
+3. 当前轮次缓存回放完成后，SDK 应先回调一次 `replayDone = true` 的结束信号
+4. 随后再按顺序继续回调待发队列中的实时事件，并为这些事件补充 `deliveryMode = live`
+5. 通过上述串行策略，保证前端始终接收到一条严格有序的事件流，避免 `text.delta`、`text.done`、`question`、`permission.reply` 等事件顺序错乱
 
 ### 错误处理
 
@@ -1032,7 +1199,7 @@ interface SessionError {
 ### 组合调用场景
 
 在与其他接口组合调用时：
-1. 建议在 `createSession` 成功后再注册监听器，确保能接收到完整的消息流
+1. 若页面可能晚于会话开始时机打开，建议在页面初始化阶段尽早调用 `registerSessionListener`，由 SDK 先补发当前未完成轮次缓存，再接收后续实时事件
 2. 若 `registerSessionListener` 失败，不影响其他接口的调用
 
 ### 注意事项
@@ -1040,6 +1207,10 @@ interface SessionError {
 - 回调注册是异步安全的，可在任何时机调用
 - 同一个 `welinkSessionId` 重复注册时，SDK 不做任何处理并返回 `status: success`
 - 如需替换监听器，需先调用 `unregisterSessionListener({ welinkSessionId })` 清理后再注册
+- `registerSessionListener` 补发的缓存事件与实时事件共用同一个 `onMessage` 回调，但前端可通过 `deliveryMode` 区分“补发事件”与“实时事件”
+- 建议前端在 `deliveryMode = replay` 阶段只做内存聚合，不做逐条流式渲染；待收到 `replayDone = true` 后，再将补发阶段聚合出的当前未完成消息一次性展示
+- 建议前端仅对 `deliveryMode = live` 的事件继续执行逐条流式渲染
+- `getSessionMessageHistory` 仅返回服务端已落库历史消息；页面晚打开场景中未监听期间丢失的流式内容，应依赖 `registerSessionListener` 的缓存补发能力恢复
 
 ### 调用示例
 
@@ -1050,20 +1221,52 @@ try {
       case "text.delta":
         console.log("AI响应片段:", message.content);
         break;
+      case "text.done":
+        console.log("AI响应完成:", message.content);
+        break;
       case "tool.update":
         console.log("工具状态:", message.toolName, message.status);
         break;
       case "question":
-        console.log("AI提问:", message.question);
+        if (message.status === "running") {
+          console.log("AI提问:", message.question, message.options);
+        } else {
+          console.log("AI提问已完成:", message.toolCallId, message.output);
+        }
         break;
       case "permission.ask":
         console.log("权限请求:", message.permissionId, message.title);
+        break;
+      case "permission.reply":
+        console.log("权限请求已应答:", message.permissionId, message.response);
+        break;
+      case "message.user":
+        console.log("收到用户消息回放:", message.content);
         break;
       case "session.status":
         console.log("原始会话状态:", message.sessionStatus);
         break;
       case "snapshot":
-        console.log("收到断线恢复快照，消息数:", message.messages.length);
+        console.log("收到断线恢复快照，消息数:", message.messages?.length ?? 0);
+        break;
+      case "streaming":
+        console.log("收到进行中流状态:", message.sessionStatus, message.parts?.length ?? 0);
+        break;
+      case "searching":
+        console.log("搜索中:", message.keywords);
+        break;
+      case "search_result":
+        console.log("搜索结果:", message.searchResults);
+        break;
+      case "reference":
+        console.log("引用列表:", message.references);
+        break;
+      case "ask_more":
+        console.log("追问建议:", message.askMoreQuestions);
+        break;
+      case "agent.online":
+      case "agent.offline":
+        console.log("Agent状态事件:", message.type);
         break;
       case "session.error":
       case "error":
@@ -1177,7 +1380,7 @@ sendMessage(params: SendMessageParams): Promise<SendMessageResult>
 | welinkSessionId | string | 是 | 会话 ID |
 | content | string | 是 | 用户输入的消息内容 |
 | toolCallId | string | 否 | 回答 AI `question` 时携带对应的工具调用 ID |
-| subagentSessionId | string | 否 | subagent 场景必传。回答子 agent 发起的 question 时，必须回传事件中的真实子会话 ID |
+| subagentSessionId | string | 否 | subagent 场景必传。回答子 agent 发起的 `question` 时，必须回传事件中的真实子会话 ID |
 
 ### 出参
 
@@ -1205,11 +1408,13 @@ sendMessage(params: SendMessageParams): Promise<SendMessageResult>
      ```json
      {
        "content": "请帮我重构登录模块的校验逻辑",
-       "toolCallId": "call_2"
+       "toolCallId": "call_2",
+       "subagentSessionId": "child-session-001"
      }
      ```
 3. AI 流式响应由 WebSocket 推送到 SDK，再通过监听器分发
 4. 对于首次发送消息的场景，此接口会触发首轮 AI 执行
+5. 若当前回复的是子 agent 发起的 `question`，必须同时透传 `toolCallId` 与 `subagentSessionId`，否则服务端会把应答路由到主对话
 
 ### 错误处理
 
@@ -1227,6 +1432,7 @@ sendMessage(params: SendMessageParams): Promise<SendMessageResult>
 1. 若 `sendMessage` 失败，不影响会话的其他操作
 2. 建议在 `createSession` 成功后再调用 `sendMessage`，确保能正常发送消息
 3. 发送消息后，应注册 `registerSessionListener` 来接收 AI 的响应
+4. 若当前回复的是子 agent 发起的 `question`，必须同时透传 `toolCallId` 与 `subagentSessionId`
 
 ### 调用示例
 
@@ -1273,6 +1479,23 @@ try {
 }
 ```
 
+#### 示例 3：回复子 agent 发起的 question
+
+```typescript
+try {
+  const result = await sendMessage({
+    welinkSessionId: "42",
+    content: "继续执行",
+    toolCallId: "call_q_1",
+    subagentSessionId: "child-session-001"
+  });
+
+  console.log("子 agent 应答发送成功:", result.id);
+} catch (error) {
+  console.error("发送子 agent 应答失败:", error.errorCode, error.errorMessage);
+}
+```
+
 ---
 
 ## 12. 权限确认接口
@@ -1293,10 +1516,10 @@ replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult>
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| welinkSessionId | string | 是 | 会话 ID |
-| permId | string | 是 | 权限请求 ID |
-| response | PermissionResponse | 是 | `once` / `always` / `reject` |
-| subagentSessionId | string | 否 | subagent 场景必传。回复子 agent 发起的 permission.ask 时，必须回传事件中的真实子会话 ID |
+| `welinkSessionId` | string | 是 | 会话 ID |
+| `permId` | String | 是 | 权限请求 ID |
+| `response` | String | 是 | `once` / `always` / `reject` |
+| `subagentSessionId` | String | 否 | subagent 场景必传。回复子 agent 发起的 `permission.ask` 时，必须回传事件中的真实子会话 ID |
 
 ### 出参
 
@@ -1314,9 +1537,11 @@ replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult>
    - **请求体**:
      ```json
      {
-       "response": "once"
+       "response": "once",
+       "subagentSessionId": "child-session-001"
      }
      ```
+3. 若收到的 `permission.ask` 事件带有 `subagentSessionId`，则该字段必须原样回传，否则服务端会把授权路由到主对话
 
 ### 错误处理
 
@@ -1333,6 +1558,7 @@ replyPermission(params: ReplyPermissionParams): Promise<ReplyPermissionResult>
 在与其他接口组合调用时：
 1. 建议在收到 `permission.ask` 事件后再调用 `replyPermission`，确保权限请求有效
 2. 若 `replyPermission` 失败，可重试发送，但需注意避免重复处理
+3. 若权限请求来自子 agent，调用时必须透传 `subagentSessionId`
 
 ### 调用示例
 
@@ -1341,7 +1567,8 @@ try {
   const result = await replyPermission({
     welinkSessionId: "42",
     permId: "perm_1",
-    response: "once"
+    response: "once",
+    subagentSessionId: "child-session-001"
   });
 
   console.log("权限确认结果:", result.response);
@@ -1437,7 +1664,7 @@ IM 客户端调用
 ### 接口名
 
 ```typescript
-createNewSession(params: CreateNewSessionParams): Promise<SkillSession>
+createNewSession(params: CreateNewSessionParams): Promise<Session>
 ```
 
 ### 入参
@@ -1563,7 +1790,7 @@ IM 客户端调用
 ### 接口名
 
 ```typescript
-getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<SkillSession>>
+getHistorySessionsList(params: HistorySessionsParams): Promise<PageResult<Session>>
 ```
 
 ### 入参
@@ -1675,104 +1902,12 @@ try {
 }
 ```
 
----
-## 16. 获取当前会话历史消息（游标查询）
-获取当前会话历史消息（游标查询）接口
-
-#### 调用方
-
-小程序调用
-
-#### 接口说明
-
-新增游标查询能力，用于聊天页首屏加载和上拉加载更早消息。该接口不依赖 `page/total`，通过游标 `nextBeforeSeq` 逐批次向前翻页。
-
-#### 接口名
-
-```typescript
-getSessionMessageHistory(params: GetSessionMessageHistoryParams): Promise<CursorResult<SessionMessage>>
-```
-
-#### 入参
-
-| 参数 | 类型 | 必填 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| welinkSessionId | string | 是 | - | 会话 ID |
-| beforeSeq | number | 否 | 无 | 查询该序号之前的更早消息；首屏加载不传 |
-| size | number | 否 | 50 | 每次拉取条数 |
-
-#### 出参
-
-| 参数名 | 类型 | 说明 |
-|--------|------|------|
-| content | Array<SessionMessage> | 当前批次消息列表（SDK 透传服务端顺序；当前服务端为消息时间正序） |
-| size | number | 本次查询的 page size |
-| hasMore | boolean | 是否还有更早消息 |
-| nextBeforeSeq | number \| null | 下次继续向前翻页时使用的游标 |
-
-#### 实现方法
-
-1. 调用服务端 REST API 前先检查 WebSocket 连接状态，若未连接则先重连。
-2. 调用服务端：
-   - **URL**: `GET /api/skill/sessions/{welinkSessionId}/messages/history`
-   - **查询参数**: `beforeSeq`（可选）、`size`（可选，默认 50）
-3. SDK 直接透传服务端返回的 `content` / `size` / `hasMore` / `nextBeforeSeq`。
-
-#### 组合调用建议
-
-1. 首屏加载：不传 `beforeSeq`，仅传 `size`。
-2. 上拉加载更早消息：传上一次响应中的 `nextBeforeSeq`。
-3. 当 `hasMore=false` 时停止继续请求。
-
-#### 调用示例
-
-```typescript
-try {
-  // 首屏加载
-  const firstPage = await getSessionMessageHistory({
-    welinkSessionId: "42",
-    size: 50
-  });
-
-  // 上拉加载更早消息
-  if (firstPage.hasMore && firstPage.nextBeforeSeq !== null) {
-    const olderPage = await getSessionMessageHistory({
-      welinkSessionId: "42",
-      size: 50,
-      beforeSeq: firstPage.nextBeforeSeq
-    });
-
-    console.log("更早消息条数:", olderPage.content.length);
-  }
-} catch (error) {
-  console.error("游标查询消息失败:", error.errorCode, error.errorMessage);
-}
-```
-
-
 ## 数据类型定义
 
 > 说明：
 > - 以下类型以客户端 SDK 对外契约为准
 > - `StreamMessage` 与服务端 WebSocket 事件模型保持对齐
 > - 本文档仅修订客户端契约；未在服务端文档中补齐的接口，仍需后续与服务端统一
-
-### SkillSession
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| welinkSessionId | string | 会话 ID |
-| userId | string | 用户 ID |
-| ak | string \| null | Access Key，未关联 Agent 时为 `null` |
-| title | string \| null | 会话标题，未设置时为 `null` |
-| bussinessDomain | string \| null | 会话关联场域 |
-| bussinessType | string \| null | 会话类型 |
-| bussinessId | string \| null | 单聊场景为对话所属人Id，群里则为群Id |
-| assistantAccount | string \| null | 助理Id |
-| status | string | 会话状态：`ACTIVE` / `IDLE` / `CLOSED` |
-| toolSessionId | string \| null | OpenCode Session ID |
-| createdAt | string | 创建时间，ISO-8601 |
-| updatedAt | string | 更新时间，ISO-8601 |
 
 ### CreateNewSessionParams
 
@@ -1819,6 +1954,14 @@ try {
 | size | number | 否 | 50 | 每页条数 |
 | isFirst | boolean | 否 | false | 是否首次获取。`true` 时合并本地流式缓存并将该消息插入返回 `content` 首位；`false` 时直接返回服务端内容（保持服务端时间降序） |
 
+### GetSessionMessageHistoryParams
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| welinkSessionId | string | 是 | - | 会话 ID |
+| beforeSeq | number | 否 | - | 查询该序号之前的更早消息；首屏加载不传 |
+| size | number | 否 | 50 | 每次拉取条数 |
+
 ### RegisterSessionListenerParams
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -1851,7 +1994,7 @@ try {
 |------|------|------|------|
 | welinkSessionId | string | 是 | 会话 ID |
 | permId | string | 是 | 权限请求 ID |
-| response | PermissionResponse | 是 | `once` / `always` / `reject` |
+| response | string | 是 | `once` / `always` / `reject` |
 | subagentSessionId | string | 否 | subagent 场景必传。回复子 agent 发起的 permission.ask 时，必须回传事件中的真实子会话 ID |
 
 ### ControlSkillWeCodeParams
@@ -1903,6 +2046,15 @@ try {
 | total | number | 总记录数 |
 | totalPages | number | 总页数 |
 
+### CursorResult<T>
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| content | Array<T> | 当前批次数据 |
+| size | number | 本次查询的 page size |
+| hasMore | boolean | 是否还有更早数据 |
+| nextBeforeSeq | number \| null | 下次继续向前翻页的游标 |
+
 ### SessionMessage
 
 > 说明：服务端 `ProtocolMessageView` 使用 `@JsonInclude(NON_NULL)`，非必返字段会省略。
@@ -1947,6 +2099,15 @@ try {
 | fileName | string \| null | 文件名（`file` 类型） |
 | fileUrl | string \| null | 文件 URL（`file` 类型） |
 | fileMime | string \| null | 文件 MIME 类型（`file` 类型） |
+
+#### SessionMessagePart 的 Subagent 扩展字段
+
+> 以下字段均为可选；仅当当前 Part 来源于子 agent 时返回。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| subagentSessionId | string \| null | 子 agent 的真实会话 ID，建议客户端作为子任务分组主键 |
+| subagentName | string \| null | 子 agent 显示名；若存在嵌套层级，使用 `" > "` 作为路径分隔符 |
 
 ### SessionStatusResult
 
@@ -1993,9 +2154,11 @@ try {
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | type | string | 事件类型 |
-| seq | number \| null | 递增序列号（部分事件可能无，如 `permission.reply`） |
-| welinkSessionId | string | 所属会话 ID |
-| emittedAt | string \| null | 事件产生时间，ISO-8601（部分事件可能无） |
+| seq | number \| null | 递增序列号；大部分事件都有，个别极简事件也可能省略 |
+| welinkSessionId | string | 所属会话 ID；`agent.online` / `agent.offline` 不携带 |
+| emittedAt | string \| null | 事件产生时间，ISO-8601；`permission.reply` / `agent.online` / `agent.offline` / `error` 通常不携带 |
+| deliveryMode | string \| null | SDK 本地补充的投递模式：`replay` 表示缓存补发，`live` 表示实时事件；若未走 `registerSessionListener` 补发链路可省略 |
+| replayDone | boolean \| null | SDK 本地补充的补发完成标记；仅在缓存补发结束信号事件中返回 `true`，其余事件通常省略 |
 
 #### 消息级字段
 
@@ -2006,14 +2169,29 @@ try {
 | messageId | string \| null | 稳定消息 ID |
 | sourceMessageId | string \| null | 源消息 ID（服务端转译链路原始消息 ID） |
 | messageSeq | number \| null | 会话内消息顺序 |
-| role | string \| null | 当前服务端返回值为 `user` / `assistant` |
+| role | string \| null | 当前服务端返回值为 `user` / `assistant`；常见于 Part 级事件、`message.user`、`streaming`、`permission.reply` |
 
 #### Part级字段
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | partId | string \| null | Part 唯一 ID（仅 part 类事件出现） |
-| partSeq | number \| null | Part 在消息内的顺序（仅 part 类事件出现） |
+| partSeq | number \| null | Part 在消息内的顺序（仅 part 类事件出现；`permission.ask` / `permission.reply` 可能缺失） |
+
+> 说明：
+> - `question` 事件分为两阶段：`running` 阶段返回 `header` / `question` / `options` / `multiSelect` / `questions` / `extParam`，`completed` 或 `error` 阶段前端应按 `partId` 关联此前的 question 状态展示。
+> - `permission.reply` 为极简事件，客户端应主要按 `permissionId` 匹配原始权限请求。
+> - `deliveryMode` 与 `replayDone` 为 SDK 本地扩展字段，不要求服务端透传；SDK 应在回调给 `SessionListener.onMessage` 前补齐。
+> - 补发完成信号仍通过 `onMessage` 下发，建议复用当前轮次最后一个事件的 `welinkSessionId`；除 `replayDone = true`、`deliveryMode = replay` 外，不要求再携带其他业务字段。
+
+#### StreamMessage 的 Subagent 扩展字段
+
+> 以下字段均为可选；仅出现在 Part 级事件，以及 `snapshot.messages[].parts[]` 和 `streaming.parts[]` 中。`session.status`、`session.title`、`session.error`、`agent.online`、`agent.offline`、`error`、`message.user` 等会话级事件不携带这些字段。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| subagentSessionId | string \| null | 子 agent 的真实会话 ID，建议客户端作为子任务分组主键 |
+| subagentName | string \| null | 子 agent 显示名；若存在嵌套层级，使用 `" > "` 作为路径分隔符 |
 
 #### `snapshot` 事件字段（`type = snapshot`）
 
@@ -2030,6 +2208,9 @@ try {
 | messages[].createdAt | string | 创建时间，ISO-8601 |
 | messages[].meta | object \| null | 元信息（可选） |
 | messages[].parts | array | Part 列表（可选） |
+
+> 说明：若 `messages[].parts[]` 中存在 `subagentSessionId`，表示该 Part 属于某个子 agent；客户端恢复快照时应按 `subagentSessionId` 重新分组展示，而不是简单平铺到主消息流。
+> 恢复场景下，服务端会先推送 `snapshot`，再推送 `streaming`；客户端不应在完整 `snapshot` 到达前按零散增量恢复界面。
 
 #### `streaming` 事件字段（`type = streaming`）
 
@@ -2054,6 +2235,9 @@ try {
 | parts[].header | string | question 分组标题（可选） |
 | parts[].question | string | question 正文（可选） |
 | parts[].options | string[] | question 选项（可选） |
+| parts[].multiSelect | boolean | question 是否多选（可选） |
+| parts[].questions | object[] | question 多题结构（可选） |
+| parts[].extParam | object | question 云端透传字段（可选） |
 | parts[].permissionId | string | 权限请求 ID（可选） |
 | parts[].permType | string | 权限类型（可选） |
 | parts[].metadata | object | 权限元数据（可选） |
@@ -2061,6 +2245,9 @@ try {
 | parts[].fileName | string | 文件名（可选） |
 | parts[].fileUrl | string | 文件 URL（可选） |
 | parts[].fileMime | string | 文件 MIME 类型（可选） |
+
+> 说明：`streaming.parts[]` 同样可能携带 `subagentSessionId` / `subagentName`；断线恢复补流时建议继续按子 agent 维度聚合当前进行中的 Part。
+> 当 `streaming.sessionStatus = idle` 时，客户端应将当前所有 streaming part 视为已完成，避免残留流式展示状态。
 
 #### 支持的事件类型
 
@@ -2071,20 +2258,70 @@ try {
 | `thinking.delta` | 思维链增量 | `content` |
 | `thinking.done` | 思维链完成 | `content` |
 | `tool.update` | 工具调用状态更新 | `toolName` `toolCallId` `status` `input` `output` `error` `title` |
-| `question` | AI 提问交互 | `toolName` `toolCallId` `status` `header` `question` `options` |
+| `question` | AI 提问交互 | `toolName` `toolCallId` `status` `header` `question` `options` `multiSelect` `questions` `extParam` |
 | `file` | 文件或图片附件 | `fileName` `fileUrl` `fileMime` |
 | `step.start` | 推理步骤开始 | 无额外必填字段 |
 | `step.done` | 推理步骤结束 | `tokens` `cost` `reason` |
 | `session.status` | 会话状态变化 | `sessionStatus` |
 | `session.title` | 会话标题变化 | `title` |
 | `session.error` | 会话级错误 | `error` |
+| `message.user` | 用户消息回放 | `content` `messageId` `messageSeq` `role` |
 | `permission.ask` | 权限请求 | `permissionId` `permType` `title` `metadata` |
 | `permission.reply` | 权限响应结果 | `permissionId` `response` |
 | `agent.online` | Agent 上线 | 无额外字段 |
-| `agent.offline` | Agent 下线 | 无额外字段 |
+| `agent.offline` | Agent 下线 | 无额外字段；前端建议去重处理，并在首次收到时结束生成态、展示错误消息 `agent已离线` |
 | `error` | 非会话级错误 | `error` |
 | `snapshot` | 断线恢复快照 | `messages` |
 | `streaming` | 断线恢复中的进行中消息 | `sessionStatus` `messageId` `messageSeq` `role` `parts` |
+| `planning.delta` | 规划增量（云端扩展） | `content` |
+| `planning.done` | 规划完成（云端扩展） | `content` |
+| `searching` | 搜索中（云端扩展） | `keywords` |
+| `search_result` | 搜索结果（云端扩展） | `searchResults` |
+| `reference` | 引用列表（云端扩展） | `references` |
+| `ask_more` | 追问建议（云端扩展） | `askMoreQuestions` |
+
+#### Subagent 事件处理约定
+
+1. SDK 监听器仍然只监听主会话 `welinkSessionId`，子 agent 相关事件不会额外开启独立通道。
+2. 当事件、`snapshot.messages[].parts[]` 或 `streaming.parts[]` 中存在 `subagentSessionId` 时，表示该内容属于对应子 agent 上下文。
+3. `text` / `thinking` / `tool` / `file` 等内容建议按 `subagentSessionId` 聚合成独立子任务块展示，而不是直接混排到主会话正文。
+4. `permission.ask` 与 `question` 可以在主界面中承载交互，但客户端回复时必须透传原始 `subagentSessionId`，否则服务端无法路由到真实子会话。
+5. 处理 `snapshot` 与 `streaming` 断线恢复数据时，也应延续同样的分组规则，避免恢复后子任务内容错挂到主消息。
+6. 客户端必须以 `subagentSessionId` 作为聚合主键，`subagentName` 仅用于展示，不能作为唯一 key。
+7. 若 `subagentName` 存在嵌套层级，应保留服务端约定的 `" > "` 路径分隔符，不要替换为 `/`、`->` 等其他符号。
+
+#### Subagent 事件示例
+
+`tool.update`（子 agent 任务执行中）：
+
+```json
+{
+  "type": "tool.update",
+  "welinkSessionId": "parent-session-001",
+  "messageId": "msg_1001",
+  "partId": "part_task_1",
+  "toolName": "task",
+  "status": "running",
+  "subagentSessionId": "child-session-001",
+  "subagentName": "代码审查 > 设计"
+}
+```
+
+`permission.ask`（子 agent 发起权限确认）：
+
+```json
+{
+  "type": "permission.ask",
+  "welinkSessionId": "parent-session-001",
+  "messageId": "msg_1001",
+  "partId": "perm_1",
+  "permissionId": "perm_xxx",
+  "permType": "file_write",
+  "title": "Request to modify src/auth/login.ts",
+  "subagentSessionId": "child-session-001",
+  "subagentName": "代码审查"
+}
+```
 
 #### 常用附加字段
 
@@ -2177,19 +2414,20 @@ try {
 |------|------|------|
 | success | boolean | 发送是否成功（服务端字段） |
 
-### GetSessionMessageHistoryParams
-
-| 字段 | 类型 | 必填 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| welinkSessionId | string | 是 | - | 会话 ID |
-| beforeSeq | number | 否 | - | 查询该序号之前的更早消息；首屏加载不传 |
-| size | number | 否 | 50 | 每次拉取条数 |
-
-### CursorResult<T>
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| content | Array<T> | 当前批次数据 |
-| size | number | 本次查询的 page size |
-| hasMore | boolean | 是否还有更早数据 |
-| nextBeforeSeq | number \| null | 下次继续向前翻页的游标 |
+### Session
+```typescript
+interface Session {
+  welinkSessionId: string;       // welinkSessionId（Snowflake ID，字符串化）
+  userId?: string;               // 会话所有者
+  ak?: string;                   // Agent Key
+  title: string;                 // 会话标题
+  bussinessDomain: string;       // 会话关联场域
+  bussinessType: string;         // 会话类型
+  bussinessId: string;           // 对话所属id，单聊为用户Id，群聊为群Id
+  assistantAccount: string;      // 分身账号id
+  status: 'ACTIVE' | 'IDLE' | 'CLOSED';
+  toolSessionId?: string;        // OpenCode 侧会话 ID（可能未就绪）
+  createdAt: string;             // ISO 时间戳
+  updatedAt: string;
+}
+```

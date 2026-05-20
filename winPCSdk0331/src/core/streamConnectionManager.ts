@@ -23,9 +23,25 @@ export interface RealtimeConnection {
 
 type Listener = RegisterSessionListenerParams;
 
+const MAX_REPLAY_CACHE_SESSIONS = 50;
+const MAX_REPLAY_EVENTS_PER_SESSION = 1000;
+const MAX_REPLAY_BYTES_PER_SESSION = 2 * 1024 * 1024;
+const REPLAY_CACHE_TTL_MS = 30 * 60 * 1000;
+
+interface ReplayCacheEntry {
+  events: StreamMessage[];
+  completed: boolean;
+  truncated: boolean;
+  updatedAt: number;
+  approxBytes: number;
+}
+
 export class StreamConnectionManager {
   private readonly listeners = new Map<string, Listener>();
   private readonly statusCallbacks = new Map<string, (result: SessionStatusResult) => void>();
+  private readonly replayCaches = new Map<string, ReplayCacheEntry>();
+  private readonly pendingLiveEvents = new Map<string, StreamMessage[]>();
+  private readonly replayingSessions = new Set<string>();
   private connection: RealtimeConnection | null = null;
   private hasEverConnected = false;
 
@@ -56,6 +72,7 @@ export class StreamConnectionManager {
 
   registerListener(listener: Listener): void {
     validateSessionId(listener.welinkSessionId);
+    this.cleanupReplayCaches();
 
     if (typeof listener.onMessage !== "function") {
       throw createSdkError(1000, "无效的参数: onMessage");
@@ -66,6 +83,7 @@ export class StreamConnectionManager {
     }
 
     this.listeners.set(listener.welinkSessionId, listener);
+    this.replayCachedEvents(listener);
   }
 
   unregisterListener(listener: UnregisterSessionListenerParams): void {
@@ -105,18 +123,18 @@ export class StreamConnectionManager {
     this.close();
     this.listeners.clear();
     this.statusCallbacks.clear();
+    this.replayCaches.clear();
+    this.pendingLiveEvents.clear();
+    this.replayingSessions.clear();
     this.hasEverConnected = false;
   }
 
   private handleMessage(payload: unknown): void {
     const message = normalizeStreamMessage(payload);
+    this.cleanupReplayCaches();
+    this.cacheReplayEvent(message);
     this.onStreamMessage(message);
-
-    const listener = this.listeners.get(message.welinkSessionId);
-
-    if (listener) {
-      listener.onMessage(message);
-    }
+    this.dispatchLiveEvent(message);
 
     const status = mapSessionStatus(message);
 
@@ -162,10 +180,229 @@ export class StreamConnectionManager {
       // Ignore unsupported or temporarily unavailable send paths during recovery.
     }
   }
+
+  private replayCachedEvents(listener: Listener): void {
+    const sessionId = listener.welinkSessionId;
+    const cache = this.replayCaches.get(sessionId);
+
+    if (!cache || cache.completed || cache.events.length === 0) {
+      return;
+    }
+
+    this.replayingSessions.add(sessionId);
+
+    for (const event of [...cache.events]) {
+      if (this.listeners.get(sessionId) !== listener) {
+        break;
+      }
+
+      listener.onMessage(withDeliveryMode(event, "replay"));
+    }
+
+    if (this.listeners.get(sessionId) === listener) {
+      listener.onMessage(createReplayDoneMessage(sessionId, cache.truncated));
+    }
+
+    this.replayingSessions.delete(sessionId);
+    this.flushPendingLiveEvents(sessionId);
+  }
+
+  private dispatchLiveEvent(message: StreamMessage): void {
+    const sessionId = message.welinkSessionId;
+
+    if (!sessionId) {
+      return;
+    }
+
+    const listener = this.listeners.get(sessionId);
+
+    if (!listener) {
+      return;
+    }
+
+    if (this.replayingSessions.has(sessionId)) {
+      this.getPendingLiveEvents(sessionId).push(cloneStreamMessage(message));
+      return;
+    }
+
+    listener.onMessage(withDeliveryMode(message, "live"));
+  }
+
+  private flushPendingLiveEvents(sessionId: string): void {
+    const pending = this.pendingLiveEvents.get(sessionId);
+
+    if (!pending || pending.length === 0) {
+      return;
+    }
+
+    this.pendingLiveEvents.delete(sessionId);
+
+    const listener = this.listeners.get(sessionId);
+
+    if (!listener) {
+      return;
+    }
+
+    for (const event of pending) {
+      listener.onMessage(withDeliveryMode(event, "live"));
+    }
+  }
+
+  private cacheReplayEvent(message: StreamMessage): void {
+    const sessionId = message.welinkSessionId;
+
+    if (!sessionId) {
+      return;
+    }
+
+    const now = Date.now();
+    let cache = this.replayCaches.get(sessionId);
+
+    if (!cache || cache.completed) {
+      cache = {
+        events: [],
+        completed: false,
+        truncated: false,
+        updatedAt: now,
+        approxBytes: 0
+      };
+      this.replayCaches.set(sessionId, cache);
+    }
+
+    cache.events.push(cloneReplayEvent(message));
+    cache.updatedAt = now;
+    cache.approxBytes = estimateEventsSize(cache.events);
+    trimReplayCache(cache);
+
+    if (isReplayRoundEnd(message)) {
+      cache.completed = true;
+      cache.events = [];
+      cache.approxBytes = 0;
+    }
+
+    this.enforceReplaySessionLimit();
+  }
+
+  private cleanupReplayCaches(): void {
+    const now = Date.now();
+
+    for (const [sessionId, cache] of this.replayCaches.entries()) {
+      if (!cache.completed && now - cache.updatedAt > REPLAY_CACHE_TTL_MS) {
+        this.replayCaches.delete(sessionId);
+        this.pendingLiveEvents.delete(sessionId);
+        this.replayingSessions.delete(sessionId);
+      }
+    }
+
+    this.enforceReplaySessionLimit();
+  }
+
+  private enforceReplaySessionLimit(): void {
+    if (this.replayCaches.size <= MAX_REPLAY_CACHE_SESSIONS) {
+      return;
+    }
+
+    const entries = [...this.replayCaches.entries()].sort(
+      (left, right) => left[1].updatedAt - right[1].updatedAt
+    );
+    const removeCount = this.replayCaches.size - MAX_REPLAY_CACHE_SESSIONS;
+
+    for (const [sessionId] of entries.slice(0, removeCount)) {
+      this.replayCaches.delete(sessionId);
+      this.pendingLiveEvents.delete(sessionId);
+      this.replayingSessions.delete(sessionId);
+    }
+  }
+
+  private getPendingLiveEvents(sessionId: string): StreamMessage[] {
+    let pending = this.pendingLiveEvents.get(sessionId);
+
+    if (!pending) {
+      pending = [];
+      this.pendingLiveEvents.set(sessionId, pending);
+    }
+
+    return pending;
+  }
 }
 
 function validateSessionId(sessionId: string): void {
   if (typeof sessionId !== "string" || !sessionId.trim()) {
     throw createSdkError(1000, "无效的参数: welinkSessionId");
+  }
+}
+
+function cloneStreamMessage(message: StreamMessage): StreamMessage {
+  return {
+    ...message,
+    options: message.options ? [...message.options] : message.options,
+    input: message.input ? { ...message.input } : message.input,
+    metadata: message.metadata ? { ...message.metadata } : message.metadata,
+    messages: message.messages ? message.messages.map((item) => ({ ...item })) : message.messages,
+    parts: message.parts ? message.parts.map((part) => ({ ...part })) : message.parts
+  };
+}
+
+function cloneReplayEvent(message: StreamMessage): StreamMessage {
+  const cloned = cloneStreamMessage(message);
+  delete cloned.deliveryMode;
+  delete cloned.replayDone;
+  delete cloned.replayTruncated;
+  return cloned;
+}
+
+function withDeliveryMode(
+  message: StreamMessage,
+  deliveryMode: NonNullable<StreamMessage["deliveryMode"]>
+): StreamMessage {
+  return {
+    ...cloneStreamMessage(message),
+    deliveryMode
+  };
+}
+
+function createReplayDoneMessage(sessionId: string, replayTruncated: boolean): StreamMessage {
+  return {
+    type: "replay.done",
+    seq: null,
+    welinkSessionId: sessionId,
+    emittedAt: null,
+    deliveryMode: "replay",
+    replayDone: true,
+    replayTruncated: replayTruncated || undefined
+  };
+}
+
+function isReplayRoundEnd(message: StreamMessage): boolean {
+  return (
+    (message.type === "session.status" && message.sessionStatus === "idle") ||
+    message.type === "session.error" ||
+    message.type === "error" ||
+    message.type === "agent.offline"
+  );
+}
+
+function trimReplayCache(cache: ReplayCacheEntry): void {
+  while (cache.events.length > MAX_REPLAY_EVENTS_PER_SESSION) {
+    cache.events.shift();
+    cache.truncated = true;
+  }
+
+  while (cache.events.length > 1 && cache.approxBytes > MAX_REPLAY_BYTES_PER_SESSION) {
+    cache.events.shift();
+    cache.truncated = true;
+    cache.approxBytes = estimateEventsSize(cache.events);
+  }
+}
+
+function estimateEventsSize(events: StreamMessage[]): number {
+  return events.reduce((total, event) => total + estimateEventSize(event), 0);
+}
+
+function estimateEventSize(event: StreamMessage): number {
+  try {
+    return JSON.stringify(event).length;
+  } catch {
+    return 0;
   }
 }

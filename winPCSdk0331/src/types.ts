@@ -171,6 +171,9 @@ export interface StreamMessage {
   seq: number | null;
   welinkSessionId: string;
   emittedAt: string | null;
+  deliveryMode?: "replay" | "live" | null;
+  replayDone?: boolean | null;
+  replayTruncated?: boolean | null;
   raw?: Record<string, unknown>;
   messageId?: string | null;
   sourceMessageId?: string | null;
