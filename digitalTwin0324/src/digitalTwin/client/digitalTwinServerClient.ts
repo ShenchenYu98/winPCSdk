@@ -6,6 +6,7 @@ import {
   deleteParams,
   deleteResult,
   grayList,
+  myAgentDetail,
   pageParams,
   QrcodeInfo,
   QueryAssistantGraySingleParams,
@@ -32,6 +33,7 @@ const QUERY_QRCODE_INFO_URL = `${DIGITAL_TWIN_BASE_URL}/nologin/we-crew/im-regis
 const UPDATE_QRCODE_INFO_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/im-register/qrcode`;
 const HAS_GRAY_URL = `${DIGITAL_TWIN_BASE_URL}/strategy/v1/has-gray`;
 const QUERY_ASSISTANT_GRAY_SINGLE_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/robot-partners/im-chat/gray-single`;
+const QUERY_MY_AGENT_DETAIL_URL = `${DIGITAL_TWIN_BASE_URL}/v4-1/we-crew/my-agent`;
 
 const INVALID_PARAMETER_ERROR_CODE = 1000;
 const NETWORK_ERROR_CODE = 6000;
@@ -72,6 +74,8 @@ export const createDigitalTwin = async (
   const description = validateRequiredString(params.description, "description");
   const weCrewType = validateWeCrewType(params.weCrewType);
   const agentType = normalizeOptionalString(params.bizRobotId);
+  const qrcode = normalizeOptionalString(params.qrcode);
+  const brainId = normalizeOptionalString(params.brainId);
 
   const payload: CreateDigitalTwinParams = {
     name,
@@ -82,6 +86,14 @@ export const createDigitalTwin = async (
 
   if (agentType) {
     payload.bizRobotId = agentType;
+  }
+
+  if (qrcode) {
+    payload.qrcode = qrcode;
+  }
+
+  if (brainId) {
+    payload.brainId = brainId;
   }
 
   let response: Response;
@@ -244,6 +256,38 @@ export const getWeAgentDetails = async (
   }
 
   return responseBody.data as WeAgentDetailsArray;
+};
+
+export const queryMyAgentDetail = async (): Promise<myAgentDetail> => {
+  let response: Response;
+
+  try {
+    response = await fetch(QUERY_MY_AGENT_DETAIL_URL, {
+      method: "GET",
+      credentials: "include"
+    });
+  } catch {
+    throw createSdkError(NETWORK_ERROR_CODE, "Network error");
+  }
+
+  const responseBody = await parseResponseBody(response);
+
+  if (!response.ok) {
+    throw buildHttpError(response.status, response.statusText, responseBody);
+  }
+
+  if (!isDigitalTwinApiResponse<unknown>(responseBody)) {
+    throw createSdkError(SERVER_ERROR_CODE, "Server error: invalid response format");
+  }
+
+  if (responseBody.code !== 200) {
+    throw createSdkError(
+      typeof responseBody.code === "number" ? responseBody.code : SERVER_ERROR_CODE,
+      getErrorMessage(responseBody, "Server error")
+    );
+  }
+
+  return responseBody.data as myAgentDetail;
 };
 
 export const updateWeAgent = async (

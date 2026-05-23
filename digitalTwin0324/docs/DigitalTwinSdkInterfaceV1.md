@@ -29,6 +29,8 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
 | description | string | 是   | 分身简介                            |
 | weCrewType  | number | 是   | 分身类型: 1为内部分身,0为自定义分身 |
 | bizRobotId  | string | 否   | 内部助手业务机器人Id                |
+| qrcode  | string | 否   | 二维码code                |
+| brainId  | string | 否   | 大脑id                |
 
 ### 入参示例
 
@@ -38,7 +40,9 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
   "icon": "/mcloud/xxx",
   "description": "数字分身小白能做...",
   "weCrewType": 1,
-  "bizRobotId": "员工助手"
+  "bizRobotId": "员工助手",
+  "qrcode": "5125125125",
+  "brainId": "24214124"
 }
 ```
 
@@ -73,7 +77,9 @@ createDigitalTwin(params: CreateDigitalTwinParams): Promise<CreateResult>
         "icon": "/mcloud/xxx",
         "description": "数字分身小白能做...",
         "weCrewType": 1,
-        "bizRobotId": "员工助手"
+        "bizRobotId": "员工助手",
+        "qrcode": "5125125125",
+        "brainId": "24214124"
      }
      ```
     - **服务端接口响应**:
@@ -133,12 +139,14 @@ getAgentType(): Promise<AgentTypeList>
     {
       "name": "员工助手",
       "icon": "http:www.test.com/xxx",
-      "bizRobotId": "8041241"
+      "bizRobotId": "8041241",
+      "id": "125125"
     },
     {
       "name": "小微助手",
       "icon": "http:www.test.com/aaa",
-      "bizRobotId": "8041241"
+      "bizRobotId": "8041241",
+      "id": "125135"
     },
   ]
 }
@@ -156,12 +164,14 @@ getAgentType(): Promise<AgentTypeList>
           {
             "name": "员工助手",
             "icon": "http:www.test.com/xxx",
-            "bizRobotId": "8041241"
+            "bizRobotId": "8041241",
+            "id": "125125"
           },
           {
             "name": "小微助手",
             "icon": "http:www.test.com/aaa",
-            "bizRobotId": "8041241"
+            "bizRobotId": "8041241",
+            "id": "125135"
           },
         ],
         "message": "success",
@@ -218,6 +228,7 @@ getWeAgentList(params: pageParams): Promise<WeAgentList>
       "bizRobotName": "员工助手",
       "bizRobotNameEn": "yuangongzhushou",
       "robotId": "78985451212",
+      "bizRobotTag": "uniassistant"
     },
     {
       "name": "小微助手",
@@ -227,6 +238,7 @@ getWeAgentList(params: pageParams): Promise<WeAgentList>
       "bizRobotName": "钉钉One",
       "bizRobotNameEn": "dingdingOne",
       "robotId": "789854124124124",
+      "bizRobotTag": "uniassistant"
     },
   ]
 }
@@ -256,6 +268,7 @@ getWeAgentList(params: pageParams): Promise<WeAgentList>
             "bizRobotName": "员工助手",
             "bizRobotNameEn": "yuangongzhushou",
             "robotId": "78985451212",
+            "bizRobotTag": "uniassistant"
           },
           {
             "name": "小微助手",
@@ -265,6 +278,7 @@ getWeAgentList(params: pageParams): Promise<WeAgentList>
             "bizRobotName": "钉钉One",
             "bizRobotNameEn": "dingdingOne",
             "robotId": "789854124124124",
+            "bizRobotTag": "uniassistant"
           }
         ],
         "message": "success",
@@ -821,6 +835,76 @@ queryAssistantGraySingle(params: QueryAssistantGraySingleParams): Promise<QueryA
 8. 当服务端返回非 `200` 时，SDK 抛出异常，并透传服务端 `code` 与 `message`。
 9.  当缓存命中后的异步刷新失败时，不影响当前已返回的缓存结果；SDK 不删除旧缓存，可记录日志用于排查。
 
+---
+
+## 11. 查询个人专属助手详情
+
+### 调用方
+
+Skill 小程序调用
+
+### 接口说明
+
+从服务端获取个人专属助手详情
+
+### 接口名
+
+```typescript
+queryMyAgentDetail(): Promise<myAgentDetail>
+```
+
+### 入参
+
+| 参数名 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| 无 | 无 | 无 | 无 |
+
+### 入参示例
+
+```json
+无
+```
+
+### 出参
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| `name` | `string` | 专属助手名称 |
+| `partnerAccount` | `string` | 专属助手IM账号 |
+| `icon` | `string` | 专属助手头像地址 |
+| `description` | `string` | 专属助手简介 |
+| `bizRobotId` | `string` | 专属助手关联大脑的robotId |
+| `bizRobotName` | `string` | 专属助手关联大脑名称 |
+| `bizRobotNameEn` | `string` | 专属助手关联大脑英文名称 |
+| `robotId` | `string` | 专属助手robotId |
+| `bizRobotTag` | `string` | 专属助手关联大脑tag |
+
+### 出参示例
+
+```json
+{
+  "name": "员工助手",
+  "icon": "http://www.test.com/xxx",
+  "description": "我是xxx",
+  "partnerAccount": "x00_1",
+  "bizRobotId": "",
+  "bizRobotTag": "uniassistant",
+  "bizRobotName": "员工助手",
+  "bizRobotNameEn": "employee_assistant",
+  "robotId": "78985451212"
+}
+```
+
+### 实现方法
+
+1. 调用服务端 REST API：`GET /v4-1/we-crew/my-agent`。
+   - 服务端响应结构为：
+     - `data: object`
+     - `message: string`
+     - `code: number`
+     - `error: string`
+2. 响应成功时透传服务端接口数据`data`
+
 
 ## 数据类型定义
 
@@ -831,6 +915,7 @@ queryAssistantGraySingle(params: QueryAssistantGraySingleParams): Promise<QueryA
 | name       | string | agent名称               |
 | icon       | string | agent图标               |
 | bizRobotId | string | agent对应的业务机器人id |
+| id | string | 大脑id |
 
 ### WeAgent
 
@@ -840,6 +925,24 @@ queryAssistantGraySingle(params: QueryAssistantGraySingleParams): Promise<QueryA
 | icon           | string | agent图标   |
 | description    | string | agent简介   |
 | partnerAccount | string | agent账号ID |
+| bizRobotName      | string | agent对应的业务机器人名称 |
+| bizRobotNameEn      | string | agent对应的业务机器人英文名 |
+| robotId      | string | agent对应的业务机器人id |
+| bizRobotTag      | string | agent对应的业务机器人tag |
+
+### myAgentDetail
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| name | string | 专属助手名称 |
+| partnerAccount | string | 专属助手IM账号 |
+| icon | string | 专属助手头像地址 |
+| description | string | 专属助手简介 |
+| bizRobotId | string | 专属助手关联大脑的robotId |
+| bizRobotName | string | 专属助手关联大脑名称 |
+| bizRobotNameEn | string | 专属助手关联大脑英文名称 |
+| robotId | string | 专属助手robotId |
+| bizRobotTag | string | 专属助手关联大脑tag |
 
 ### pageParams
 

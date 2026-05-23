@@ -3,7 +3,9 @@ export interface CreateDigitalTwinParams {
   icon: string,
   description: string,
   weCrewType: number,
-  bizRobotId?: string
+  bizRobotId?: string,
+  qrcode?: string,
+  brainId?: string
 }
 
 export interface CreateResult {
@@ -21,7 +23,8 @@ export interface AgentTypeList {
 export interface AgentType {
   name: string,
   icon: string,
-  bizRobotId: string
+  bizRobotId: string,
+  id: string
 }
 
 export interface pageParams {
@@ -40,7 +43,20 @@ export interface WeAgent {
   partnerAccount: string,
   bizRobotName: string,
   bizRobotNameEn: string,
-  robotId: string
+  robotId: string,
+  bizRobotTag: string
+}
+
+export interface myAgentDetail {
+  name: string,
+  partnerAccount: string,
+  icon: string,
+  description: string,
+  bizRobotId: string,
+  bizRobotName: string,
+  bizRobotNameEn: string,
+  robotId: string,
+  bizRobotTag: string
 }
 
 export interface queryWeAgentParams {

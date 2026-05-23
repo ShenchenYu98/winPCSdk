@@ -9,5 +9,6 @@ export {
   updateQrcodeInfo,
   updateWeAgent,
   getWeAgentList,
-  getWeAgentDetails
+  getWeAgentDetails,
+  queryMyAgentDetail
 } from "../digitalTwin/client/digitalTwinServerClient";
