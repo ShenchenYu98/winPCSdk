@@ -63,7 +63,9 @@ export class SkillServerClient {
   }
 
   async createNewSession(params: CreateNewSessionParams): Promise<Session> {
+    this.validateRequired(params.businessSessionDomain, "businessSessionDomain");
     this.validateRequired(params.businessSessionId, "businessSessionId");
+    this.validateRequired(params.businessSessionType, "businessSessionType");
 
     return this.request<Session>("/api/skill/sessions", {
       method: "POST",
@@ -166,6 +168,10 @@ export class SkillServerClient {
   }
 
   async createSession(params: CreateNewSessionParams): Promise<Session> {
+    this.validateRequired(params.businessSessionDomain, "businessSessionDomain");
+    this.validateRequired(params.businessSessionId, "businessSessionId");
+    this.validateRequired(params.businessSessionType, "businessSessionType");
+
     const sessions = await this.listReusableSessions(params);
     const latestReusableSession = sessions.content
       .filter((session) => {
@@ -207,9 +213,9 @@ export class SkillServerClient {
     payload: CreateNewSessionParams
   ): CreateNewSessionPayload {
     const normalized: CreateNewSessionPayload = {
-      businessSessionDomain: payload.businessSessionDomain?.trim() || "miniapp",
+      businessSessionDomain: payload.businessSessionDomain.trim(),
       businessSessionId: payload.businessSessionId.trim(),
-      businessSessionType: payload.businessSessionType?.trim() || "direct"
+      businessSessionType: payload.businessSessionType.trim()
     };
 
     if (payload.ak?.trim()) {

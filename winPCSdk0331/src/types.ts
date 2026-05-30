@@ -22,9 +22,9 @@ export interface Session {
 export interface CreateNewSessionParams {
   ak?: string;
   title?: string;
-  businessSessionDomain?: string;
+  businessSessionDomain: string;
   businessSessionId: string;
-  businessSessionType?: string;
+  businessSessionType: string;
   assistantAccount?: string;
 }
 

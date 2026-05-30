@@ -26,18 +26,18 @@ export class SessionOrchestrator {
   ) {}
 
   async createSession(params: CreateNewSessionParams): Promise<Session> {
+    validateRequired(params.businessSessionDomain, "businessSessionDomain");
     validateRequired(params.businessSessionId, "businessSessionId");
+    validateRequired(params.businessSessionType, "businessSessionType");
     return this.client.createSession(params);
   }
 
   async createNewSession(params: CreateNewSessionParams): Promise<Session> {
+    validateRequired(params.businessSessionDomain, "businessSessionDomain");
     validateRequired(params.businessSessionId, "businessSessionId");
+    validateRequired(params.businessSessionType, "businessSessionType");
 
-    return this.client.createNewSession({
-      ...params,
-      businessSessionDomain: params.businessSessionDomain ?? "miniapp",
-      businessSessionType: params.businessSessionType ?? "direct"
-    });
+    return this.client.createNewSession(params);
   }
 
   async sendMessage(params: SendMessageParams): Promise<SendMessageResult> {

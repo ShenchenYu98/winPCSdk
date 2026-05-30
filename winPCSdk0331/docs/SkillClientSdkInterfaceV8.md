@@ -58,9 +58,9 @@ createSession(params: CreateNewSessionParams): Promise<Session>
 |--------|------|------|------|
 | ak | String | 否 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
 | title | String | 否 | 会话标题，不填则由 AI 自动生成 |
-| businessSessionDomain | String | 否 | 会话关联场域，默认值"miniapp" |
+| businessSessionDomain | String | 是 | 会话关联场域，默认值"miniapp" |
 | businessSessionId | String | 是 | 会话归属ID，单聊为用户ID，群聊为群Id |
-| businessSessionType | String | 否 | 会话类型,默认值"direct" |
+| businessSessionType | String | 是 | 会话类型,默认值"direct" |
 | assistantAccount | String | 否 | 助理ID |
 
 ### 入参示例
@@ -1459,9 +1459,9 @@ createNewSession(params: CreateNewSessionParams): Promise<SkillSession>
 |--------|------|------|------|
 | ak | String | 否 | Agent Plugin 对应的 Access Key，用于定位 Agent 连接 |
 | title | String | 否 | 会话标题，不填则由 AI 自动生成 |
-| businessSessionDomain | String | 否 | 会话关联场域，默认值"miniapp" |
+| businessSessionDomain | String | 是 | 会话关联场域，默认值"miniapp" |
 | businessSessionId | String | 是 | 会话归属ID，单聊为用户ID，群聊为群Id |
-| businessSessionType | String | 否 | 会话类型,默认值"direct" |
+| businessSessionType | String | 是 | 会话类型,默认值"direct" |
 | assistantAccount | String | 否 | 助理ID |
 
 ### 入参示例
